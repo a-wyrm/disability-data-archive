@@ -1,8 +1,9 @@
 
 # folders
 node_modules/
-migrations
+
 
 
 # files
 .env
+package-lock.json

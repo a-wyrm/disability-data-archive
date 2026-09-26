@@ -29,3 +29,7 @@ The app exposes:
 - `GET /records?q=...` for the HTMX search fragment
 - `GET /health` for a health check
 
+To run on pgAdmin:
+
+- host.docker.internal
+

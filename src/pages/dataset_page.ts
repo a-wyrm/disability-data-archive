@@ -1,9 +1,15 @@
-type Dataset = {
-	title: string;
-	description: string;
-	source: string;
-	published_year: number;
-};
+import { DisabilityArtifactsTable } from "../db/db.js";
+import { findArtifactWithTags } from "../db/db_functions.js";
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] ?? character);
+}
 
 export type DatasetFilters = {
 	tag?: string;
@@ -11,35 +17,23 @@ export type DatasetFilters = {
 	to?: number;
 };
 
-function escapeHtml(value: string) {
-	return value.replace(/[&<>"']/g, (character) => ({
-		'&': '&amp;',
-		'<': '&lt;',
-		'>': '&gt;',
-		'"': '&quot;',
-		"'": '&#39;',
-	})[character] ?? character);
-}
 
-export function datasetTags(dataset: Dataset) {
-	const text = `${dataset.title} ${dataset.description}`.toLowerCase();
-	const tags = new Set<string>();
+export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters: DatasetFilters = {}) {
 
-	if (text.includes('survey')) tags.add('Surveys');
-	if (text.includes('access') || text.includes('barrier')) tags.add('Accessibility');
-	if (text.includes('employment')) tags.add('Employment');
-	if (text.includes('education') || text.includes('school') || text.includes('learning')) tags.add('Education');
-	if (text.includes('longitudinal')) tags.add('Longitudinal');
-	if (text.includes('public service')) tags.add('Public services');
+	const ids = datasets.map(dataset => dataset.id);
+	const artifactsWithTags = await Promise.all(ids.map((id) => findArtifactWithTags(Number(id))));
+	const tags = [
+		...new Set(
+			artifactsWithTags
+			.filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null)
+			.flatMap(artifact => artifact.tags.map(tag => tag.name))
+		),
+	].sort();
 
-	return [...tags];
-}
-
-export function DatasetPage(datasets: Dataset[], filters: DatasetFilters = {}) {
-	const tags = [...new Set(datasets.flatMap(datasetTags))].sort();
-	const years = datasets.map((dataset) => dataset.published_year);
-	const minYear = Math.min(...years);
-	const maxYear = Math.max(...years);
+	const years = datasets.map((dataset) => dataset.created_at);
+	const minYear = Math.min(...years.map(value => Number(String(value).slice(0, 4))));
+	const maxYear = Math.max(...years.map(value => Number(String(value).slice(0, 4))));
+	
 	const tagValue = filters.tag ?? '';
 	const fromValue = filters.from?.toString() ?? '';
 	const toValue = filters.to?.toString() ?? '';
@@ -47,18 +41,18 @@ export function DatasetPage(datasets: Dataset[], filters: DatasetFilters = {}) {
 	const tiles = datasets.length === 0
 		? '<p class="empty">No datasets match these filters.</p>'
 		: datasets.map((dataset, index) => `
-			<article class="dataset-tile" style="--tile-index: ${index}" aria-label="${escapeHtml(dataset.title)}">
+			<article class="dataset-tile" style="--tile-index: ${index}" aria-label="${escapeHtml(dataset.file_name)}">
 				<div class="tile-topline">
 					<span class="tile-number">${String(index + 1).padStart(2, '0')}</span>
-					<span>${dataset.published_year}</span>
+					<span>${dataset.created_at}</span>
 				</div>
 				<div>
-					<p class="eyebrow">${escapeHtml(dataset.source)}</p>
-					<h2>${escapeHtml(dataset.title)}</h2>
-					<p class="tile-description">${escapeHtml(dataset.description)}</p>
+					<p class="eyebrow">${escapeHtml(dataset.org_source)}</p>
+					<h2>${escapeHtml(dataset.file_name)}</h2>
+					<p class="tile-description">${escapeHtml(dataset.artifact_type)}</p>
 				</div>
 				<footer>
-					<span>${datasetTags(dataset).map(escapeHtml).join(' · ')}</span>
+					<span>${(artifactsWithTags[index]?.tags ?? []).map(tag => escapeHtml(tag.name)).join(' · ')}</span>
 					<span aria-hidden="true">↗</span>
 				</footer>
 			</article>

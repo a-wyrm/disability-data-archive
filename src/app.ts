@@ -1,9 +1,48 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { db } from './db/db.js';
 import { Header } from './components/header.js';
-import { recordRows } from './db/db_functions.js';
-import { DatasetPage, datasetTags, type DatasetFilters } from './pages/dataset_page.js';
+import { getAllArtifacts } from './db/db_functions.js';
+
+// pages
+import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
+import { AboutPage } from './pages/about.js';
+
+type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] ?? character);
+}
+
+function recordRows(records: ArtifactRecord[]) {
+  return records.length === 0
+    ? '<p class="empty">No artifacts found.</p>'
+    : records.map((record) => `
+      <article class="record-row">
+        <div>
+          <h2>${escapeHtml(record.file_name)}</h2>
+          <p>${escapeHtml(record.org_source)} · ${escapeHtml(record.artifact_type)}</p>
+        </div>
+        <a href="${escapeHtml(record.file_path)}">Open artifact</a>
+      </article>
+    `).join('');
+}
+
+function datasetTags(record: ArtifactRecord): string[] {
+  
+  const value = (record as ArtifactRecord & { tags?: unknown }).tags;
+
+  if (Array.isArray(value)) {
+    return value.filter((tag): tag is string => typeof tag === 'string');
+  }
+
+  return typeof value === 'string' ? value.split(',').map((tag) => tag.trim()).filter(Boolean) : [];
+}
 
 // HTMX stuff
 type Variables = { isHtmx: boolean };
@@ -17,8 +56,6 @@ app.use('*', async (c, next) => {
 // static files
 app.use('/static/*', serveStatic({ root: './' }));
 app.get('/__dev/revision', (c) => c.text(devRevision));
-
-
 
 function layout(content: string) {
   return `
@@ -53,10 +90,7 @@ function layout(content: string) {
 }
 
 app.get('/', async (c) => {
-  const records = await db.selectFrom('records')
-    .select(['title', 'description', 'source', 'published_year'])
-    .orderBy('published_year', 'desc')
-    .execute();
+  const records = await getAllArtifacts();
 
   const content = `
     <section class="archive" aria-labelledby="archive-title">
@@ -71,10 +105,7 @@ app.get('/', async (c) => {
 });
 
 app.get('/datasets', async (c) => {
-  const records = await db.selectFrom('records')
-    .select(['title', 'description', 'source', 'published_year'])
-    .orderBy('published_year', 'desc')
-    .execute();
+  const artifacts = await getAllArtifacts();
 
   const rawFrom = Number(c.req.query('from'));
   const rawTo = Number(c.req.query('to'));
@@ -83,31 +114,36 @@ app.get('/datasets', async (c) => {
     from: Number.isInteger(rawFrom) ? rawFrom : undefined,
     to: Number.isInteger(rawTo) ? rawTo : undefined,
   };
-  const filteredRecords = records.filter((record) => {
+  
+  const filteredRecords = artifacts.filter((record) => {
     const matchingTag = !filters.tag || datasetTags(record).includes(filters.tag);
-    const afterStart = filters.from === undefined || record.published_year >= filters.from;
-    const beforeEnd = filters.to === undefined || record.published_year <= filters.to;
+    const publishedYear = Number.parseInt(record.dataset_date ?? '', 10) || 0;
+    const afterStart = filters.from === undefined || publishedYear >= filters.from;
+    const beforeEnd = filters.to === undefined || publishedYear <= filters.to;
     return matchingTag && afterStart && beforeEnd;
   });
 
-  return c.html(layout(DatasetPage(filteredRecords, filters)));
+  return c.html(layout(await DatasetPage(
+    filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
+    filters,
+  )));
 });
 
 app.get('/records', async (c) => {
   const query = c.req.query('q')?.trim() ?? '';
-  const records = await db.selectFrom('records')
-    .select(['title', 'description', 'source', 'published_year'])
-    .where((expression) => query
-      ? expression.or([
-        expression('title', 'ilike', `%${query}%`),
-        expression('description', 'ilike', `%${query}%`),
-        expression('source', 'ilike', `%${query}%`),
-      ])
-      : expression('id', 'is not', null))
-    .orderBy('published_year', 'desc')
-    .execute();
+  const artifacts = await getAllArtifacts();
+  const records = query ? artifacts.filter((artifact) => [
+      artifact.file_name,
+      artifact.file_path,
+      artifact.org_source,
+      artifact.artifact_type,
+      artifact.dataset_date,
+    ].some((value) => value?.toLowerCase().includes(query.toLowerCase())))
+    : artifacts;
 
   return c.html(recordRows(records));
 });
 
-app.get('/health', (c) => c.json({ ok: true }));
+app.get('/about', async (c) => {
+  return c.html(layout(AboutPage()));
+});

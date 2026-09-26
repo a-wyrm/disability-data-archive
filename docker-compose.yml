@@ -4,8 +4,8 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: disability_archive
-      POSTGRES_USER: archive
-      POSTGRES_PASSWORD: archive
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -22,7 +22,7 @@ services:
     build: .
     environment:
       PORT: 3000
-      DATABASE_URL: postgres://archive:archive@db:5432/disability_archive
+      DATABASE_URL: ${DATABASE_URL}
     ports:
       - "3000:3000"
     depends_on:

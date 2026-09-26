@@ -7,7 +7,7 @@ export function Header() {
                 </ul>
                 <ul>
                     <li><a href="/datasets">Datasets</a></li>
-                    <li><a href="/records">About</a></li>
+                    <li><a href="/about">About</a></li>
                     <li><a href="/records">Contact</a></li>
                     <li>
                         <div class="tag-select-container">
