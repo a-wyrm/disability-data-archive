@@ -1,5 +1,7 @@
 import { DisabilityArtifactsTable } from "../db/db.js";
 import { findArtifactWithTags } from "../db/db_functions.js";
+import { FilterBySubject } from "../components/filter_by_subject.js";
+import { TimelineSlider } from "../components/timeline_slider.js";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -31,8 +33,9 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 	].sort();
 
 	const years = datasets.map((dataset) => dataset.created_at);
-	const minYear = Math.min(...years.map(value => Number(String(value).slice(0, 4))));
-	const maxYear = Math.max(...years.map(value => Number(String(value).slice(0, 4))));
+	const parsedYears = years.map(value => Number(String(value).slice(0, 4))).filter(Number.isFinite);
+	const minYear = parsedYears.length > 0 ? Math.min(...parsedYears) : new Date().getFullYear();
+	const maxYear = parsedYears.length > 0 ? Math.max(...parsedYears) : minYear;
 	
 	const tagValue = filters.tag ?? '';
 	const fromValue = filters.from?.toString() ?? '';
@@ -41,10 +44,10 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 	const tiles = datasets.length === 0
 		? '<p class="empty">No datasets match these filters.</p>'
 		: datasets.map((dataset, index) => `
-			<article class="dataset-tile" style="--tile-index: ${index}" aria-label="${escapeHtml(dataset.file_name)}">
+			<a class="dataset-tile" data-subjects="${escapeHtml((artifactsWithTags[index]?.tags ?? []).map(tag => tag.name).join('|'))}" style="--tile-index: ${index}" href="/datasets/${dataset.id}" aria-label="View ${escapeHtml(dataset.file_name)}">
 				<div class="tile-topline">
 					<span class="tile-number">${String(index + 1).padStart(2, '0')}</span>
-					<span>${dataset.created_at}</span>
+					<span>${escapeHtml(dataset.dataset_date ?? 'Date unknown')}</span>
 				</div>
 				<div>
 					<p class="eyebrow">${escapeHtml(dataset.org_source)}</p>
@@ -55,7 +58,7 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 					<span>${(artifactsWithTags[index]?.tags ?? []).map(tag => escapeHtml(tag.name)).join(' · ')}</span>
 					<span aria-hidden="true">↗</span>
 				</footer>
-			</article>
+			</a>
 		`).join('');
 
 	return `
@@ -73,14 +76,11 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 				<div class="filter-heading">
 					<h2 id="filter-title">Filters</h2>
 				</div>
-				<form method="get" action="/">
-					<label for="tag">Subject</label>
-					<select id="tag" name="tag">
-						<option value="">All subjects</option>
-						${tags.map((tag) => `<option value="${escapeHtml(tag)}"${tag === tagValue ? ' selected' : ''}>${escapeHtml(tag)}</option>`).join('')}
-					</select>
+				<form method="get" action="/datasets">
+					${FilterBySubject({ subjects: tags, selectedSubject: tagValue })}
 					<fieldset>
 						<legend>Publication year</legend>
+						${TimelineSlider({ minYear, maxYear, from: filters.from, to: filters.to })}
 						<div class="year-fields">
 							<label for="from">From<input id="from" name="from" type="number" min="${minYear}" max="${maxYear}" value="${fromValue}" placeholder="${minYear}"></label>
 							<label for="to">To<input id="to" name="to" type="number" min="${minYear}" max="${maxYear}" value="${toValue}" placeholder="${maxYear}"></label>

@@ -4,12 +4,12 @@ import { createArtifactWithTags } from "../db_functions.js";
 
 
 const dummyData: NewDisabilityArtifact = {
-    artifact_type: "csv",
+    artifact_type: "pdf",
     file_path: "/",
     file_name: "test",
     org_source: "test"
 } 
 
 
-await createArtifactWithTags(dummyData, ["test"]);
+await createArtifactWithTags(dummyData, ["politics", "health"]);
 await closeDatabase();

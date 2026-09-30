@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Header } from './components/header.js';
-import { getAllArtifacts } from './db/db_functions.js';
+import { findArtifactWithTags, getAllArtifacts } from './db/db_functions.js';
 
 // pages
 import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
+import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
 
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
@@ -106,6 +107,12 @@ app.get('/', async (c) => {
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
+  const taggedArtifacts = await Promise.all(artifacts.map((artifact) => findArtifactWithTags(Number(artifact.id))));
+  const tagsByArtifactId = new Map(
+    taggedArtifacts
+      .filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null)
+      .map((artifact) => [artifact.id, artifact.tags.map((tag) => tag.name)]),
+  );
 
   const rawFrom = Number(c.req.query('from'));
   const rawTo = Number(c.req.query('to'));
@@ -116,7 +123,7 @@ app.get('/datasets', async (c) => {
   };
   
   const filteredRecords = artifacts.filter((record) => {
-    const matchingTag = !filters.tag || datasetTags(record).includes(filters.tag);
+    const matchingTag = !filters.tag || (tagsByArtifactId.get(record.id) ?? []).includes(filters.tag);
     const publishedYear = Number.parseInt(record.dataset_date ?? '', 10) || 0;
     const afterStart = filters.from === undefined || publishedYear >= filters.from;
     const beforeEnd = filters.to === undefined || publishedYear <= filters.to;
@@ -127,6 +134,20 @@ app.get('/datasets', async (c) => {
     filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
     filters,
   )));
+});
+
+app.get('/datasets/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id < 1) {
+    return c.notFound();
+  }
+
+  const dataset = await findArtifactWithTags(id);
+  if (!dataset) {
+    return c.notFound();
+  }
+
+  return c.html(layout(DatasetDetailPage(dataset)));
 });
 
 app.get('/records', async (c) => {

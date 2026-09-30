@@ -8,7 +8,7 @@ export function Header() {
                 <ul>
                     <li><a href="/datasets">Datasets</a></li>
                     <li><a href="/about">About</a></li>
-                    <li><a href="/records">Contact</a></li>
+                    <li><a href="/contact">Contact</a></li>
                     <li>
                         <div class="tag-select-container">
                             <input class="tag-input" placeholder="search bar..."> </input>
