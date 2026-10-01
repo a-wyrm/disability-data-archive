@@ -1,17 +1,7 @@
 import { DisabilityArtifactsTable } from "../db/db.js";
 import { findArtifactWithTags } from "../db/db_functions.js";
 import { FilterBySubject } from "../components/filter_by_subject.js";
-import { TimelineSlider } from "../components/timeline_slider.js";
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[character] ?? character);
-}
+import { escapeHtml } from "../utilities/escape_html.js";
 
 export type DatasetFilters = {
 	tag?: string;
@@ -32,14 +22,14 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 		),
 	].sort();
 
-	const years = datasets.map((dataset) => dataset.created_at);
+	const years = datasets.map((dataset) => dataset.dataset_date);
 	const parsedYears = years.map(value => Number(String(value).slice(0, 4))).filter(Number.isFinite);
 	const minYear = parsedYears.length > 0 ? Math.min(...parsedYears) : new Date().getFullYear();
 	const maxYear = parsedYears.length > 0 ? Math.max(...parsedYears) : minYear;
 	
 	const tagValue = filters.tag ?? '';
-	const fromValue = filters.from?.toString() ?? '';
-	const toValue = filters.to?.toString() ?? '';
+	const fromValue = filters.from?.toString() ?? minYear;
+	const toValue = filters.to?.toString() ?? maxYear;
 
 	const tiles = datasets.length === 0
 		? '<p class="empty">No datasets match these filters.</p>'
@@ -63,7 +53,6 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 
 	return `
 		<section class="page-intro" aria-labelledby="datasets-title">
-        <link rel="stylesheet" href="/static/styles.css">
 			<div>
 				<h1>Available datasets</h1>
 				<p>Browse by tag, source, and publication year.</p>
@@ -80,14 +69,13 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 					${FilterBySubject({ subjects: tags, selectedSubject: tagValue })}
 					<fieldset>
 						<legend>Publication year</legend>
-						${TimelineSlider({ minYear, maxYear, from: filters.from, to: filters.to })}
 						<div class="year-fields">
-							<label for="from">From<input id="from" name="from" type="number" min="${minYear}" max="${maxYear}" value="${fromValue}" placeholder="${minYear}"></label>
-							<label for="to">To<input id="to" name="to" type="number" min="${minYear}" max="${maxYear}" value="${toValue}" placeholder="${maxYear}"></label>
+							<label for="from">From<input id="from" name="from" type="number" min="${minYear}" max="${maxYear}" value="${fromValue}" placeholder=""></label>
+							<label for="to">To<input id="to" name="to" type="number" min="${minYear}" max="${maxYear}" value="${toValue}" placeholder=""></label>
 						</div>
 					</fieldset>
 					<button type="submit">Apply filters</button>
-					<a class="reset-link" href="/">Reset filters</a>
+					<a class="reset-link" href="/datasets">Reset filters</a>
 				</form>
 			</aside>
 			<section class="dataset-grid" aria-live="polite" aria-label="Dataset collection">

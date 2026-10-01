@@ -1,3 +1,5 @@
+import { escapeHtml } from "../utilities/escape_html.js";
+
 type DatasetDetail = {
 	id: number;
 	artifact_type: string;
@@ -11,15 +13,6 @@ type DatasetDetail = {
 	tags: { id: number; name: string }[];
 };
 
-function escapeHtml(value: string) {
-	return value.replace(/[&<>"']/g, (character) => ({
-		'&': '&amp;',
-		'<': '&lt;',
-		'>': '&gt;',
-		'"': '&quot;',
-		"'": '&#39;',
-	})[character] ?? character);
-}
 
 function formatDate(value: Date) {
 	return value.toLocaleDateString('en-US', {
@@ -60,7 +53,7 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 				</div>
 			</div>
 
-			<a class="artifact-link" href="${escapeHtml(dataset.file_path)}">Open artifact ↗</a>
+			<a class="artifact-link" href="${escapeHtml(dataset.file_path)}">Open artifact</a>
 		</section>
 	`;
 }

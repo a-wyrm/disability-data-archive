@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Header } from './components/header.js';
 import { findArtifactWithTags, getAllArtifacts } from './db/db_functions.js';
+import { escapeHtml } from "./utilities/escape_html.js";
 
 // pages
 import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
@@ -10,15 +11,6 @@ import { AboutPage } from './pages/about.js';
 
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[character] ?? character);
-}
 
 function recordRows(records: ArtifactRecord[]) {
   return records.length === 0
@@ -65,8 +57,14 @@ function layout(content: string) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" href="/static/disability-pride-flag.png"></link>
         <title>Disability Data Archive</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css"
+        >
+        <link rel="stylesheet" href="/static/styles.css">
+
         <script>
           (() => {
             const revision = '${devRevision}';

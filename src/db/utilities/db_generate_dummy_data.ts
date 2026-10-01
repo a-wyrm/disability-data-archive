@@ -4,10 +4,11 @@ import { createArtifactWithTags } from "../db_functions.js";
 
 
 const dummyData: NewDisabilityArtifact = {
-    artifact_type: "pdf",
+    artifact_type: "csv",
     file_path: "/",
-    file_name: "test",
-    org_source: "test"
+    file_name: "cool database",
+    dataset_date: "2023-01-28",
+    org_source: "NHS"
 } 
 
 
