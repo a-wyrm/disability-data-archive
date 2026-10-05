@@ -88,29 +88,28 @@ export async function findArtifactWithTags(artifactId: number) {
 
 
 
-// Search artifacts with filters
-export async function searchArtifacts(filters: {tagNames?: string[]; orgSource?: string; type?: string; limit?: number; offset?: number;}) {
-  let query = db.selectFrom('disability_artifacts').selectAll('disability_artifacts');
+export async function searchArtifacts(query: string) {
 
-  if (filters.type) {
-    query = query.where('artifact_type', '=', filters.type);
-  }
-  if (filters.orgSource) {
-    query = query.where('org_source', '=', filters.orgSource);
-  }
-  if (filters.tagNames && filters.tagNames.length > 0) {
-    query = query
-      .innerJoin('artifact_tags', 'artifact_tags.artifact_id', 'disability_artifacts.id')
-      .innerJoin('tags', 'tags.id', 'artifact_tags.tag_id')
-      .where('tags.name', 'in', filters.tagNames)
-      .distinct();
-  }
-  if (filters.limit) {
-    query = query.limit(filters.limit);
-  }
-  if (filters.offset) {
-    query = query.offset(filters.offset);
-  }
+	const words = query.trim().split(/\s+/).filter(Boolean);
+  let request = db
+    .selectFrom('disability_artifacts')
+    .leftJoin('artifact_tags', 'artifact_tags.artifact_id', 'disability_artifacts.id')
+    .leftJoin('tags', 'tags.id', 'artifact_tags.tag_id')
+    .selectAll('disability_artifacts')
+    .distinct();
 
-  return await query.execute();
+	for (const word of words) {
+		const searchTerm = `%${word}%`;
+
+		request = request.where((eb) =>
+			eb.or([
+				eb('file_name', 'ilike', searchTerm),
+				eb('org_source', 'ilike', searchTerm),
+				eb('artifact_type', 'ilike', searchTerm),
+        eb('tags.name', 'ilike', searchTerm),
+			])
+		);
+	}
+
+	return await request.execute();
 }

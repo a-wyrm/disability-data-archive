@@ -1,4 +1,5 @@
 import { themeSwitcherScript } from "../utilities/change_theme.js";
+import { SearchBar } from "./searchbar.js";
 
 
 export function Header() {
@@ -13,9 +14,7 @@ export function Header() {
                     <li><a href="/about">About</a></li>
                     <li><a href="/contact">Contact</a></li>
                     <li>
-                        <div class="tag-select-container">
-                            <input class="tag-input" placeholder="search bar..."> </input>
-                        </div>
+                        ${SearchBar()}
                     </li>
                     <li>
                         <a class="contrast theme-toggle" aria-label="Switch themes" title="Switch themes" data-theme-toggle href="#">

@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Header } from './components/header.js';
-import { findArtifactWithTags, getAllArtifacts } from './db/db_functions.js';
+import { findArtifactWithTags, getAllArtifacts, searchArtifacts } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 
 // pages
 import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
 import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
+import { SearchPage } from './pages/search_page.js';
 
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 
@@ -88,6 +89,7 @@ function layout(content: string) {
     </html>`;
 }
 
+//TODO: Clean up filtered artifacts to be its own function
 app.get('/', async (c) => {
   const records = await getAllArtifacts();
 
@@ -103,13 +105,29 @@ app.get('/', async (c) => {
   return c.html(layout(content));
 });
 
+app.get("/search", async (c) => {
+	const searchValue = c.req.query("q") ?? "";
+
+  const artifacts = await searchArtifacts(searchValue);
+  const results = await Promise.all(artifacts.map(async (artifact) => {
+    const artifactWithTags = await findArtifactWithTags(Number(artifact.id));
+    return {
+      ...artifact,
+      tags: artifactWithTags?.tags ?? [],
+    };
+  }));
+
+  return c.html(layout(SearchPage(results, searchValue)));
+});
+
+
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
   const taggedArtifacts = await Promise.all(artifacts.map((artifact) => findArtifactWithTags(Number(artifact.id))));
   const tagsByArtifactId = new Map(
     taggedArtifacts
       .filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null)
-      .map((artifact) => [artifact.id, artifact.tags.map((tag) => tag.name)]),
+      .map((artifact) => [artifact.id, artifact.tags.map((tag) => tag.name)])
   );
 
   const rawFrom = Number(c.req.query('from'));

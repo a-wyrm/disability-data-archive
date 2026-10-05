@@ -5,6 +5,7 @@ import { escapeHtml } from "../utilities/escape_html.js";
 
 export type DatasetFilters = {
 	tag?: string;
+	org_name?: string;
 	from?: number;
 	to?: number;
 };
