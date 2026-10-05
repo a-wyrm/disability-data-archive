@@ -26,6 +26,12 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 	const tags = dataset.tags.length === 0
 		? '<span>None</span>'
 		: dataset.tags.map((tag) => `<span>${escapeHtml(tag.name)}</span>`).join('');
+	const isCsv = dataset.artifact_type.toLowerCase() === 'csv'
+		|| dataset.file_name.toLowerCase().endsWith('.csv');
+	const datasetAction = isCsv
+		? `<a class="artifact-link" href="/datasets/${dataset.id}/view">View dataset</a>
+			<a class="artifact-link secondary" href="${escapeHtml(dataset.file_path)}">Download CSV</a>`
+		: `<a class="artifact-link" href="${escapeHtml(dataset.file_path)}">Open artifact</a>`;
 
 	return `
 		<a class="back-link" href="/datasets">← Back to datasets</a>
@@ -48,12 +54,11 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 					<dl class="detail-list">
 						<div><dt>Added</dt><dd>${formatDate(dataset.added_at)}</dd></div>
 						<div><dt>Last updated</dt><dd>${formatDate(dataset.updated_at)}</dd></div>
-						<div><dt>Record ID</dt><dd>${dataset.id}</dd></div>
 					</dl>
 				</div>
 			</div>
 
-			<a class="artifact-link" href="${escapeHtml(dataset.file_path)}">Open artifact</a>
+			<div class="artifact-actions">${datasetAction}</div>
 		</section>
 	`;
 }

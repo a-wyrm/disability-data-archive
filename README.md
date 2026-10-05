@@ -32,4 +32,3 @@ The app exposes:
 To run on pgAdmin:
 
 - host.docker.internal
-

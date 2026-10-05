@@ -16,16 +16,3 @@ CREATE TABLE disability_artifacts (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Many-to-many: artifacts to tags
--- when deleted cascade down
-CREATE TABLE artifact_tags (
-  artifact_id INT REFERENCES disability_artifacts(id) ON DELETE CASCADE,
-  tag_id INT REFERENCES tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (artifact_id, tag_id)
-);
-
--- Indexes for search performance
-CREATE INDEX idx_artifact_type ON disability_artifacts(artifact_type);
-CREATE INDEX idx_org_source ON disability_artifacts(org_source);
-CREATE INDEX idx_tag_name ON tags(name);
-CREATE INDEX idx_csv_artifact ON csv_data(artifact_id);

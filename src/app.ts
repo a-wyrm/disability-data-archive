@@ -9,6 +9,8 @@ import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
 import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
+import { ContactPage } from './pages/contact.js';
+import { CsvViewer } from './components/csv_viewer.js';
 
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 
@@ -16,15 +18,23 @@ type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 function recordRows(records: ArtifactRecord[]) {
   return records.length === 0
     ? '<p class="empty">No artifacts found.</p>'
-    : records.map((record) => `
-      <article class="record-row">
-        <div>
-          <h2>${escapeHtml(record.file_name)}</h2>
-          <p>${escapeHtml(record.org_source)} · ${escapeHtml(record.artifact_type)}</p>
-        </div>
-        <a href="${escapeHtml(record.file_path)}">Open artifact</a>
-      </article>
-    `).join('');
+    : records.map((record) => {
+      const isCsv = record.artifact_type.toLowerCase() === 'csv'
+        || record.file_name.toLowerCase().endsWith('.csv');
+      const artifactUrl = isCsv
+        ? `/datasets/${record.id}/view`
+        : record.file_path;
+
+      return `
+        <article class="record-row">
+          <div>
+            <h2>${escapeHtml(record.file_name)}</h2>
+            <p>${escapeHtml(record.org_source)} · ${escapeHtml(record.artifact_type)}</p>
+          </div>
+          <a href="${escapeHtml(artifactUrl)}">Open artifact</a>
+        </article>
+      `;
+    }).join('');
 }
 
 function datasetTags(record: ArtifactRecord): string[] {
@@ -64,7 +74,7 @@ function layout(content: string) {
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css"
         >
-        <link rel="stylesheet" href="/static/styles.css">
+        <link rel="stylesheet" href="/static/css/styles.css">
 
         <script>
           (() => {
@@ -166,6 +176,25 @@ app.get('/datasets/:id', async (c) => {
   return c.html(layout(DatasetDetailPage(dataset)));
 });
 
+app.get('/datasets/:id/view', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id < 1) {
+    return c.notFound();
+  }
+
+  const dataset = await findArtifactWithTags(id);
+  if (!dataset) {
+    return c.notFound();
+  }
+
+  const isCsv = dataset.artifact_type.toLowerCase() === 'csv' || dataset.file_name.toLowerCase().endsWith('.csv');
+  if (!isCsv) {
+    return c.redirect(`/datasets/${id}`);
+  }
+
+  return c.html(layout(CsvViewer(dataset)));
+});
+
 app.get('/records', async (c) => {
   const query = c.req.query('q')?.trim() ?? '';
   const artifacts = await getAllArtifacts();
@@ -184,3 +213,7 @@ app.get('/records', async (c) => {
 app.get('/about', async (c) => {
   return c.html(layout(AboutPage()));
 });
+
+app.get('/contact', async (c) => {
+  return c.html(layout(ContactPage()));
+})

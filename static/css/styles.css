@@ -3,21 +3,6 @@ main.container {
 	padding-bottom: 4rem;
 }
 
-.page-intro {
-	align-items: end;
-	border-bottom: 1px solid;
-	display: flex;
-	justify-content: space-between;
-	margin: 3rem 0 2rem;
-	padding-bottom: 2rem;
-}
-.page-intro h1 {
-	font-size: clamp(2.5rem, 6vw, 5.25rem);
-	letter-spacing: -0.04em;
-	line-height: .95;
-	margin: .35rem 0 1rem;
-}
-
 
 .dataset-layout {
 	align-items: start;
@@ -166,6 +151,17 @@ main.container {
 	font-size: 1.1rem;
 	font-weight: 700;
 }
+.artifact-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+}
+.artifact-link.secondary,
+.secondary {
+	font-size: .95rem;
+	font-weight: 500;
+}
+
 
 
 .tile-topline,
