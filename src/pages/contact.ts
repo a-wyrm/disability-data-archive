@@ -9,7 +9,7 @@ export function ContactPage() {
         </p>
 
         <p> 
-            If you prefer to email us, send your message to disabilitydata@aapd.com. 
+            If you prefer to email us, send your message to <a href="mailto:disabilitydata@aapd.com">disabilitydata@aapd.com</a>.
             Use “Disability Data Archive Project” as the subject line and include the information requested above or let us know your preference for receiving updates about the project.
         </p>
 

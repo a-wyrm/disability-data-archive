@@ -38,7 +38,7 @@ export type DisabilityArtifact = Selectable<DisabilityArtifactsTable>;
 export type NewDisabilityArtifact = Insertable<DisabilityArtifactsTable>;
 
 const pool = new pg.Pool({
-  connectionString: process.env.FRONTEND_URL,
+  connectionString: process.env.DATABASE_URL,
 });
 
 export const db = new Kysely<Database>({

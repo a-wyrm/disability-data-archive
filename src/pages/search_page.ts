@@ -38,8 +38,8 @@ export function SearchPage(artifacts: SearchResult[], searchValue: string) {
 		`).join("");
 
 	return `
-    <main>
+    <section>
         <h1>Search results</h1>
         ${results}
-    </main>`;
+    </section>`;
 }

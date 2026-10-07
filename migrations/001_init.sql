@@ -16,3 +16,9 @@ CREATE TABLE disability_artifacts (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Many-to-many relationship between artifacts and tags
+CREATE TABLE artifact_tags (
+  artifact_id INTEGER NOT NULL REFERENCES disability_artifacts(id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (artifact_id, tag_id)
+);

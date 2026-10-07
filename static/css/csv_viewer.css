@@ -77,14 +77,15 @@
 }
 
 .csv-search-label {
-  color: var(--csv-gray-700);
+  color: var(--csv-gray-800);
   font-size: .75rem;
   font-weight: 700;
   margin: 0;
 }
 
 .csv-toolbar input[type="search"] {
-  background: #fff;
+  background: #ffffff;
+  color: black;
   border: 1px solid var(--csv-gray-200);
   border-radius: .25rem;
   font-size: .875rem;
@@ -194,10 +195,6 @@
 
   .csv-toolbar-title {
     flex-basis: 100%;
-  }
-
-  .csv-search-label {
-    align-self: center;
   }
 
   .csv-toolbar input[type="search"] {

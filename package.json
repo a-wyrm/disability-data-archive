@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc --noEmit",
-    "start": "tsx src/server.ts"
+    "start": "tsx src/server.ts",
+    "data": "tsx src/db/utilities/db_generate_dummy_data.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",

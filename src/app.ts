@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { statSync } from 'node:fs';
 import { Header } from './components/header.js';
 import { findArtifactWithTags, getAllArtifacts, searchArtifacts } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
@@ -51,7 +52,15 @@ function datasetTags(record: ArtifactRecord): string[] {
 // HTMX stuff
 type Variables = { isHtmx: boolean };
 export const app = new Hono<{ Variables: Variables }>();
-const devRevision = Date.now().toString();
+const devStart = Date.now().toString();
+const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css'];
+function getDevRevision() {
+  const stylesheetRevisions = stylesheetPaths
+    .map((stylesheetPath) => statSync(stylesheetPath).mtimeMs)
+    .join('-');
+  return `${devStart}-${stylesheetRevisions}`;
+}
+
 app.use('*', async (c, next) => {
   c.set('isHtmx', c.req.header('HX-Request') === 'true');
   await next();
@@ -59,7 +68,7 @@ app.use('*', async (c, next) => {
 
 // static files
 app.use('/static/*', serveStatic({ root: './' }));
-app.get('/__dev/revision', (c) => c.text(devRevision));
+app.get('/__dev/revision', (c) => c.text(getDevRevision()));
 
 function layout(content: string) {
   return `
@@ -74,11 +83,11 @@ function layout(content: string) {
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css"
         >
-        <link rel="stylesheet" href="/static/css/styles.css">
+        <link rel="stylesheet" href="/static/css/styles.css?v=${getDevRevision()}">
 
         <script>
           (() => {
-            const revision = '${devRevision}';
+            const revision = '${getDevRevision()}';
             setInterval(async () => {
               try {
                 const response = await fetch('/__dev/revision', { cache: 'no-store' });
@@ -91,8 +100,9 @@ function layout(content: string) {
         </script>
     </head>
     <body>
-        <main class="container">
+        <a class="skip-link" href="#main-content">Skip to main content</a>
         ${Header()}
+        <main id="main-content" class="container" tabindex="-1">
         ${content}
         </main>
     </body>
@@ -192,7 +202,7 @@ app.get('/datasets/:id/view', async (c) => {
     return c.redirect(`/datasets/${id}`);
   }
 
-  return c.html(layout(CsvViewer(dataset)));
+  return c.html(layout(CsvViewer(dataset, getDevRevision())));
 });
 
 app.get('/records', async (c) => {

@@ -11,6 +11,14 @@ const dummyData: NewDisabilityArtifact = {
     org_source: "CDC"
 } 
 
+const dummyData2: NewDisabilityArtifact = {
+    artifact_type: "csv",
+    file_path: "/static/acs_2024_disability_employment.csv",
+    file_name: "Disability Employment",
+    dataset_date: "2024-01-01",
+    org_source: "ACS"
+} 
 
-await createArtifactWithTags(dummyData, ["politics", "health"]);
+
+await createArtifactWithTags(dummyData, ["health", "politics"]);
 await closeDatabase();

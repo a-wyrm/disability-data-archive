@@ -5,7 +5,7 @@ type CsvDataset = {
 	file_path: string;
 };
 
-export function CsvViewer(dataset: CsvDataset) {
+export function CsvViewer(dataset: CsvDataset, stylesheetVersion?: string) {
 	return `
 		<section class="csv-viewer" aria-labelledby="csv-viewer-title" data-csv-url="${escapeHtml(dataset.file_path)}">
 			<div class="csv-viewer-heading">
@@ -29,6 +29,6 @@ export function CsvViewer(dataset: CsvDataset) {
 			</div>
 		</section>
 		<script src="/static/csv_viewer.js" defer></script>
-		<link rel="stylesheet" href="/static/css/csv_viewer.css">
+		<link rel="stylesheet" href="/static/css/csv_viewer.css${stylesheetVersion ? `?v=${stylesheetVersion}` : ""}">
 	`;
 }

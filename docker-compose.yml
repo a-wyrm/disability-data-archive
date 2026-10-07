@@ -6,13 +6,14 @@ services:
       POSTGRES_DB: disability_archive
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGUSER: ${DB_USERNAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U archive -d disability_archive"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d disability_archive"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,7 +23,7 @@ services:
     build: .
     environment:
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@db:5432/disability_archive
     ports:
       - "3000:3000"
     depends_on:
