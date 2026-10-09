@@ -3,7 +3,6 @@ main.container {
 	padding-bottom: 4rem;
 }
 
-
 .skip-link {
   position: absolute;
   width: 1px;
@@ -190,6 +189,49 @@ main.container {
 	font-weight: 500;
 }
 
+.submit-page {
+	border-top: 1px solid;
+	margin-top: 2rem;
+	max-width: 760px;
+	padding-top: 3rem;
+}
+.submit-page h1 {
+	font-size: clamp(2.5rem, 7vw, 5.5rem);
+	letter-spacing: -0.04em;
+	line-height: .95;
+}
+.submit-intro {
+	font-size: 1.15rem;
+	max-width: 50rem;
+}
+.submit-form {
+	margin-top: 3rem;
+}
+.submit-form label {
+	font-weight: 700;
+}
+.submit-form small {
+	font-weight: 400;
+}
+.submit-form input {
+	margin-top: .4rem;
+}
+.form-message {
+	border-left: 4px solid;
+	margin: 2rem 0;
+	padding: 1rem;
+}
+.form-message.error {
+	border-color: var(--pico-color-red-500);
+}
+.form-message.success {
+	border-color: var(--pico-color-green-500);
+}
+.submit-honeypot {
+	left: -10000px;
+	position: absolute;
+}
+
 
 
 .tile-topline,
@@ -225,12 +267,16 @@ main.container {
     color: var(--pico-form-element-color);
     font-size: 0.875rem;
 }
+.filter-chip_label {
+	padding-right: 5px;
+}
 .filter-chip_remove {
     margin-bottom: 0;
-    font-size: 0.75rem;
+	padding-bottom: 5px;
     line-height: 1;
     --pico-form-element-spacing-vertical: 0.125rem;
     --pico-form-element-spacing-horizontal: 0.375rem;
+	color: #686969;
     border-radius: 50%;
 	background-color: transparent;
 }

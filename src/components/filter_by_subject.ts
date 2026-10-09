@@ -98,7 +98,7 @@ export function FilterBySubject({ subjects, selectedSubject = '' }: SubjectFilte
                             chip.className = 'badge react';
 
                             const label = document.createElement('span');
-                            label.className = 'filter-chip__label';
+                            label.className = 'filter-chip_label';
                             label.textContent = subject;
 
                             const remove = document.createElement('button');

@@ -44,10 +44,24 @@ export function AboutPage() {
             We are building a long-term, sustainable archive of disability data. We are:
         </p>
         <ul>
-            <li>Rescusing data that has already been taken down</li>
+            <li>Rescuing data that has already been taken down</li>
             <li>Protecting data that is still available but may be at risk</li>
             <li>Keeping the data open, accessible, and free for anyone to use indefinitely</li>
         </ul>
+
+        <br>
+        <hr>
+
+        <h1> Get Involved or Receive Updates </h1>
+        <p>
+            You can sign up for updates, tell us about data that may be at risk, or offer your skills, knowledge, or time using the form on
+            the American Association of People with Disabilities' website <a href="https://www.aapd.com/disability-data-archive-project/" target="_blank">here</a>.
+        </p>
+
+        <p> 
+            If you prefer to email us, send your message to <a href="mailto:disabilitydata@aapd.com">disabilitydata@aapd.com</a>.
+            Use “Disability Data Archive Project” as the subject line and include the information requested above or let us know your preference for receiving updates about the project.
+        </p>
 
 
     `;

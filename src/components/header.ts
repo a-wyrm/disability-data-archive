@@ -11,8 +11,8 @@ export function Header() {
                 </ul>
                 <ul>
                     <li><a href="/datasets">Datasets</a></li>
+                    <li><a href="/submit">Submit</a></li>
                     <li><a href="/about">About</a></li>
-                    <li><a href="/contact">Contact</a></li>
                     <li>
                         ${SearchBar()}
                     </li>

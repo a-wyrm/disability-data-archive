@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { statSync } from 'node:fs';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { Header } from './components/header.js';
-import { findArtifactWithTags, getAllArtifacts, searchArtifacts } from './db/db_functions.js';
+import { createArtifactWithTags, findArtifactWithTags, getAllArtifacts, searchArtifacts } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 
 // pages
@@ -10,8 +12,18 @@ import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
 import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
-import { ContactPage } from './pages/contact.js';
+import { SubmitPage, submitError, submitSuccess } from './pages/submit_db.js';
 import { CsvViewer } from './components/csv_viewer.js';
+
+const uploadDirectory = './uploads';
+const maxUploadBytes = 10 * 1024 * 1024;
+const allowedExtensions = new Map([
+  ['.csv', { type: 'csv', mimeTypes: ['text/csv', 'application/csv', 'application/vnd.ms-excel'] }],
+  ['.jpg', { type: 'image', mimeTypes: ['image/jpeg'] }],
+  ['.jpeg', { type: 'image', mimeTypes: ['image/jpeg'] }],
+  ['.png', { type: 'image', mimeTypes: ['image/png'] }],
+]);
+const submissionAttempts = new Map<string, number[]>();
 
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 
@@ -68,6 +80,7 @@ app.use('*', async (c, next) => {
 
 // static files
 app.use('/static/*', serveStatic({ root: './' }));
+app.use('/uploads/*', serveStatic({ root: './' }));
 app.get('/__dev/revision', (c) => c.text(getDevRevision()));
 
 function layout(content: string) {
@@ -224,6 +237,93 @@ app.get('/about', async (c) => {
   return c.html(layout(AboutPage()));
 });
 
-app.get('/contact', async (c) => {
-  return c.html(layout(ContactPage()));
-})
+
+// for submitting to db
+app.get('/submit', (c) => c.html(layout(SubmitPage())));
+app.post('/submit', async (c) => {
+
+  // TODO: prevent IP submission from same IP for at least 30 mins afterward 
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const now = Date.now();
+  const recentAttempts = (submissionAttempts.get(ip) ?? []).filter((time) => now - time < 60 * 60 * 1000);
+  if (recentAttempts.length >= 5) {
+    return c.html(layout(SubmitPage(submitError('Too many submissions from this address. Please try again later.'))), 429);
+  }
+  recentAttempts.push(now);
+  submissionAttempts.set(ip, recentAttempts);
+
+  // get body
+  const body = await c.req.parseBody({ all: true });
+  if (typeof body.website === 'string' && body.website.trim() !== '') {
+    return c.html(layout(SubmitPage(submitSuccess())));
+  }
+
+
+  const fileName = typeof body.file_name === 'string' ? body.file_name.trim() : '';
+  const orgSource = typeof body.org_source === 'string' ? body.org_source.trim() : '';
+  const datasetDate = typeof body.dataset_date === 'string' ? body.dataset_date.trim() : '';
+  const file = body.artifact_file;
+
+  const tags = (Array.isArray(body.tags) ? body.tags : [body.tags])
+    .filter((tag): tag is string => typeof tag === 'string')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  console.log(body);
+
+  if (!fileName || !orgSource || !(file instanceof File)) {
+    return c.html(layout(SubmitPage(submitError('Enter a name, organization/source, and a file.'))), 400);
+  }
+  else if (fileName.length > 255 || orgSource.length > 255 || datasetDate.length > 100) {
+    return c.html(layout(SubmitPage(submitError('One or more fields are longer than allowed.'))), 400);
+  }
+  else if (datasetDate && datasetDate.toLowerCase() !== 'unknown' && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(datasetDate)) {
+    return c.html(layout(SubmitPage(submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.'))), 400);
+  }
+  else if (file.size === 0 || file.size > maxUploadBytes) {
+    return c.html(layout(SubmitPage(submitError('The file must be between 1 byte and 10 MB.'))), 400);
+  }
+
+  const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
+  const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
+  const allowed = allowedExtensions.get(extension);
+  if (!allowed || !allowed.mimeTypes.includes(file.type.toLowerCase())) {
+    return c.html(layout(SubmitPage(submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.'))), 400);
+  }
+
+  // verify inputs
+  const content = Buffer.from(await file.arrayBuffer());
+  if (extension === '.jpg' || extension === '.jpeg') {
+    if (content[0] !== 0xff || content[1] !== 0xd8 || content[content.length - 2] !== 0xff || content[content.length - 1] !== 0xd9) {
+      return c.html(layout(SubmitPage(submitError('The JPG file contents do not match its extension.'))), 400);
+    }
+  } 
+  else if (extension === '.png') {
+    if (content.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
+      return c.html(layout(SubmitPage(submitError('The PNG file contents do not match its extension.'))), 400);
+    }
+  } 
+  else if (content.includes(0)) {
+    return c.html(layout(SubmitPage(submitError('The CSV file contains binary data and could not be accepted.'))), 400);
+  }
+
+  await mkdir(uploadDirectory, { recursive: true });
+  const storedName = `${randomUUID()}${extension}`;
+  const storedPath = `${uploadDirectory}/${storedName}`;
+  try {
+    await writeFile(storedPath, content, { flag: 'wx' });
+    await createArtifactWithTags({
+      artifact_type: allowed.type,
+      file_path: `/uploads/${storedName}`,
+      file_name: fileName,
+      dataset_date: datasetDate || null,
+      org_source: orgSource,
+    }, tags);
+  }
+
+  catch (error) {
+    await unlink(storedPath).catch(() => undefined);
+    return c.html(layout(SubmitPage(submitError('The submission could not be saved. Please try again.'))), 500);
+  }
+
+  return c.html(layout(SubmitPage(submitSuccess())));
+});

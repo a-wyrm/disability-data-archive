@@ -26,9 +26,12 @@ services:
       DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@db:5432/disability_archive
     ports:
       - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   postgres_data:
+  uploads_data:

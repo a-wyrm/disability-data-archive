@@ -45,6 +45,7 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 					<h2>Dataset information</h2>
 					<dl class="detail-list">
 						<div><dt>Source</dt><dd>${escapeHtml(dataset.org_source)}</dd></div>
+						<div><dt>File</dt><dd>${escapeHtml(dataset.file_name)}</dd></div>
 						<div><dt>Publication date</dt><dd>${escapeHtml(dataset.dataset_date ?? 'Unknown')}</dd></div>
 						<div><dt>Subject</dt><dd class="detail-tags">${tags}</dd></div>
 					</dl>
