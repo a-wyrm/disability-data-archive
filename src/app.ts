@@ -4,8 +4,9 @@ import { statSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { Header } from './components/header.js';
-import { createArtifactWithTags, findArtifactWithTags, getAllArtifacts, searchArtifacts } from './db/db_functions.js';
+import { createArtifactWithTags, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getPendingArtifacts, reviewArtifact, searchArtifacts } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
+import { clearSession, createSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
 // pages
 import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
@@ -14,6 +15,10 @@ import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
 import { SubmitPage, submitError, submitSuccess } from './pages/submit_db.js';
 import { CsvViewer } from './components/csv_viewer.js';
+import { CreateAccountPage, accountError } from './pages/userPages/create_account.js';
+import { LoginPage, loginError } from './pages/userPages/login.js';
+import { ReviewListPage } from './pages/userPages/review_list.js';
+import { ReviewFilePage } from './pages/userPages/review_files.js';
 
 const uploadDirectory = './uploads';
 const maxUploadBytes = 10 * 1024 * 1024;
@@ -83,7 +88,7 @@ app.use('/static/*', serveStatic({ root: './' }));
 app.use('/uploads/*', serveStatic({ root: './' }));
 app.get('/__dev/revision', (c) => c.text(getDevRevision()));
 
-function layout(content: string) {
+function layout(content: string, isAuthenticated = false) {
   return `
   <!doctype html>
     <html lang="en">
@@ -114,7 +119,7 @@ function layout(content: string) {
     </head>
     <body>
         <a class="skip-link" href="#main-content">Skip to main content</a>
-        ${Header()}
+        ${Header(isAuthenticated)}
         <main id="main-content" class="container" tabindex="-1">
         ${content}
         </main>
@@ -237,6 +242,68 @@ app.get('/about', async (c) => {
   return c.html(layout(AboutPage()));
 });
 
+app.get('/signup', (c) => c.html(layout(CreateAccountPage(), Boolean(getSession(c)))));
+app.post('/signup', async (c) => {
+  const body = await c.req.parseBody();
+  const username = typeof body.username === 'string' ? body.username.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (!/^[a-zA-Z0-9_]{3,100}$/.test(username) || !/^\S+@\S+\.\S+$/.test(email) || password.length < 12) {
+    return c.html(layout(CreateAccountPage(accountError('Use a valid username, email, and a password of at least 12 characters.'))), 400);
+  }
+  try {
+    const user = await createUser(username, email, await hashPassword(password));
+    setSessionCookie(c, createSession(user.user_id, user.username));
+    return c.redirect('/userPages/review_list');
+  } catch {
+    return c.html(layout(CreateAccountPage(accountError('That username or email is already in use.'))), 409);
+  }
+});
+
+app.get('/login', (c) => c.html(layout(LoginPage(), Boolean(getSession(c)))));
+app.post('/login', async (c) => {
+  const body = await c.req.parseBody();
+  const login = typeof body.login === 'string' ? body.login.trim().toLowerCase() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  const user = await findUserByLogin(login);
+  if (!user || user.is_locked || !(await verifyPassword(password, user.password_hash))) {
+    return c.html(layout(LoginPage(loginError('The login details are not valid.'))), 401);
+  }
+  setSessionCookie(c, createSession(user.user_id, user.username));
+  return c.redirect('/userPages/review_list');
+});
+
+app.get('/logout', (c) => {
+  clearSession(c);
+  return c.redirect('/');
+});
+
+app.get('/userPages/review_list', async (c) => {
+  const session = getSession(c);
+  if (!session) return c.redirect('/login');
+  return c.html(layout(ReviewListPage(await getPendingArtifacts()), true));
+});
+
+app.get('/userPages/review_files/:id', async (c) => {
+  if (!getSession(c)) return c.redirect('/login');
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id < 1) return c.notFound();
+  const artifact = await findPendingArtifact(id);
+  if (!artifact) return c.notFound();
+  return c.html(layout(ReviewFilePage(artifact), true));
+});
+
+app.post('/userPages/review_files/:id', async (c) => {
+  const session = getSession(c);
+  if (!session) return c.redirect('/login');
+  const id = Number(c.req.param('id'));
+  const body = await c.req.parseBody();
+  const decision = body.decision;
+  if (!Number.isInteger(id) || id < 1 || (decision !== 'approved' && decision !== 'denied')) return c.notFound();
+  await reviewArtifact(id, session.userId, decision);
+  return c.redirect('/userPages/review_list');
+});
+
 
 // for submitting to db
 app.get('/submit', (c) => c.html(layout(SubmitPage())));
@@ -252,22 +319,20 @@ app.post('/submit', async (c) => {
   recentAttempts.push(now);
   submissionAttempts.set(ip, recentAttempts);
 
-  // get body
+  // get body -- all of it. hono function
   const body = await c.req.parseBody({ all: true });
   if (typeof body.website === 'string' && body.website.trim() !== '') {
     return c.html(layout(SubmitPage(submitSuccess())));
   }
 
 
+  // get names, ensure they are strings
   const fileName = typeof body.file_name === 'string' ? body.file_name.trim() : '';
   const orgSource = typeof body.org_source === 'string' ? body.org_source.trim() : '';
   const datasetDate = typeof body.dataset_date === 'string' ? body.dataset_date.trim() : '';
   const file = body.artifact_file;
 
-  const tags = (Array.isArray(body.tags) ? body.tags : [body.tags])
-    .filter((tag): tag is string => typeof tag === 'string')
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
   console.log(body);
 
   if (!fileName || !orgSource || !(file instanceof File)) {

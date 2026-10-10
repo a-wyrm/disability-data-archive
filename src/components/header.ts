@@ -2,8 +2,9 @@ import { themeSwitcherScript } from "../utilities/change_theme.js";
 import { SearchBar } from "./searchbar.js";
 
 
-export function Header() {
+export function Header(isAuthenticated = false) {
   return `
+        <link rel="stylesheet" href="/static/css/header_styles.css">
         <header class="container">
             <nav>
                 <ul>
@@ -13,6 +14,24 @@ export function Header() {
                     <li><a href="/datasets">Datasets</a></li>
                     <li><a href="/submit">Submit</a></li>
                     <li><a href="/about">About</a></li>
+                    <li>
+                        <div class="dropdown">
+                            <button 
+                                class="dropdown_button" 
+                                aria-haspopup="true" 
+                                aria-expanded="false" 
+                                id="dropdown-btn"> 
+                                Account Controls 
+                            </button>
+                            <div 
+                                class="dropdown-content" 
+                                role="menu" 
+                                aria-labelledby="dropdown-btn">
+                                <a href="${isAuthenticated ? '/userPages/review_list' : '/login'}" role="menuitem">${isAuthenticated ? 'Reviews' : 'Log in'}</a>
+                                ${isAuthenticated ? '<a href="/logout" role="menuitem">Log out</a>' : '<a href="/signup" role="menuitem">Sign up</a>'}
+                            </div>
+                        </div>
+                    </li>
                     <li>
                         ${SearchBar()}
                     </li>

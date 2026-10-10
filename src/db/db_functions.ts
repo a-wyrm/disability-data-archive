@@ -3,7 +3,21 @@ import { db, NewDisabilityArtifact } from "./db.js";
 
 // Get list of artifacts
 export async function getAllArtifacts() {
-  return await db.selectFrom('disability_artifacts').selectAll().execute();
+  return await db.selectFrom('disability_artifacts').selectAll().where('reviewed', '=', true).execute();
+}
+
+export async function getPendingArtifacts() {
+  return await db
+    .selectFrom('disability_artifacts')
+    .selectAll()
+    .where('reviewed', '=', false)
+    .where(({ not, exists, selectFrom }) => not(exists(
+      selectFrom('artifacts_review')
+        .select('review_id')
+        .whereRef('artifacts_review.artifact_id', '=', 'disability_artifacts.id')
+    )))
+    .orderBy('added_at', 'asc')
+    .execute();
 }
 
 // Create artifact w/ tags
@@ -12,7 +26,7 @@ export async function createArtifactWithTags(artifact: NewDisabilityArtifact, ta
     // Insert artifact -- trx is transaction
     const insertedArtifact = await trx
       .insertInto('disability_artifacts')
-      .values(artifact)
+      .values({ ...artifact, reviewed: false })
       .returningAll()
       .executeTakeFirstOrThrow();
 
@@ -51,6 +65,7 @@ export async function findArtifactsByTags(tagNames: string[]) {
     .innerJoin('artifact_tags', 'artifact_tags.artifact_id', 'disability_artifacts.id')
     .innerJoin('tags', 'tags.id', 'artifact_tags.tag_id')
     .where('tags.name', 'in', tagNames)
+    .where('disability_artifacts.reviewed', '=', true)
     .distinct()
     .execute();
 }
@@ -60,6 +75,7 @@ export async function findArtifactsByOrgSource(orgSource: string) {
     .selectFrom('disability_artifacts')
     .selectAll()
     .where('org_source', '=', orgSource)
+    .where('reviewed', '=', true)
     .execute();
 }
 
@@ -69,6 +85,7 @@ export async function findArtifactWithTags(artifactId: number) {
     .selectFrom('disability_artifacts')
     .selectAll()
     .where('id', '=', artifactId)
+    .where('reviewed', '=', true)
     .executeTakeFirst();
 
   if (!artifact) return null;
@@ -98,6 +115,8 @@ export async function searchArtifacts(query: string) {
     .selectAll('disability_artifacts')
     .distinct();
 
+  request = request.where('disability_artifacts.reviewed', '=', true);
+
 	for (const word of words) {
 		const searchTerm = `%${word}%`;
 
@@ -112,4 +131,64 @@ export async function searchArtifacts(query: string) {
 	}
 
 	return await request.execute();
+}
+
+export async function findPendingArtifact(artifactId: number) {
+  return await db
+    .selectFrom('disability_artifacts')
+    .selectAll()
+    .where('id', '=', artifactId)
+    .where('reviewed', '=', false)
+    .where(({ not, exists, selectFrom }) => not(exists(
+      selectFrom('artifacts_review')
+        .select('review_id')
+        .whereRef('artifacts_review.artifact_id', '=', 'disability_artifacts.id')
+    )))
+    .executeTakeFirst();
+}
+
+export async function reviewArtifact(artifactId: number, userId: number, status: 'approved' | 'denied') {
+  return await db.transaction().execute(async (trx) => {
+    const artifact = await trx
+      .selectFrom('disability_artifacts')
+      .select('id')
+      .where('id', '=', artifactId)
+      .where('reviewed', '=', false)
+      .where(({ not, exists, selectFrom }) => not(exists(
+        selectFrom('artifacts_review')
+          .select('review_id')
+          .whereRef('artifacts_review.artifact_id', '=', 'disability_artifacts.id')
+      )))
+      .executeTakeFirst();
+
+    if (!artifact) return false;
+
+    await trx.insertInto('artifacts_review').values({
+      artifact_id: artifactId,
+      user_id: userId,
+      review_status: status,
+      review_ratings: null,
+    }).execute();
+
+    await trx
+      .updateTable('disability_artifacts')
+      .set({ reviewed: status === 'approved', updated_at: new Date() })
+      .where('id', '=', artifactId)
+      .execute();
+
+    return true;
+  });
+}
+
+export async function findUserByLogin(login: string) {
+  return await db.selectFrom('users').selectAll()
+    .where((eb) => eb.or([eb('email', '=', login), eb('username', '=', login)]))
+    .executeTakeFirst();
+}
+
+export async function createUser(username: string, email: string, passwordHash: string) {
+  return await db.insertInto('users')
+    .values({ username, email, password_hash: passwordHash })
+    .returning(['user_id', 'username', 'email', 'is_locked'])
+    .executeTakeFirstOrThrow();
 }
