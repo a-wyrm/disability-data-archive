@@ -1,10 +1,11 @@
 import { themeSwitcherScript } from "../utilities/change_theme.js";
 import { SearchBar } from "./searchbar.js";
+import { getDevRevision } from "../app.js";
 
 
 export function Header(isAuthenticated = false) {
   return `
-        <link rel="stylesheet" href="/static/css/header_styles.css">
+        <link rel="stylesheet" href="/static/css/header_styles.css?v=${getDevRevision()}">
         <header class="container">
             <nav>
                 <ul>
@@ -21,7 +22,7 @@ export function Header(isAuthenticated = false) {
                                 aria-haspopup="true" 
                                 aria-expanded="false" 
                                 id="dropdown-btn"> 
-                                Account Controls 
+                                Account Controls ↓
                             </button>
                             <div 
                                 class="dropdown-content" 

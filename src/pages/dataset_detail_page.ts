@@ -36,7 +36,6 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 	return `
 		<a class="back-link" href="/datasets">← Back to datasets</a>
 		<section class="dataset-detail" aria-labelledby="dataset-title">
-			<p class="eyebrow">${escapeHtml(dataset.org_source)}</p>
 			<h1 id="dataset-title">${escapeHtml(dataset.file_name)}</h1>
 			<p class="detail-type">${escapeHtml(dataset.artifact_type)}</p>
 

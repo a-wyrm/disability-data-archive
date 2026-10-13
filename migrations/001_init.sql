@@ -46,13 +46,13 @@ CREATE TABLE artifacts_review (
 );
 
 CREATE TABLE review_comments (
-    comment_id INT PRIMARY KEY,
-    review_id INT,
-    user_id INT,
-    comment_text TEXT,
-    comment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (review_id) REFERENCES artifacts_review(review_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    comment_id SERIAL PRIMARY KEY,
+    artifact_id INTEGER NOT NULL REFERENCES disability_artifacts(id) ON DELETE CASCADE,
+    parent_comment_id INTEGER REFERENCES review_comments(comment_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    comment_text TEXT NOT NULL,
+    comment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    edited_at TIMESTAMP
 );
 
 -- Many-to-many relationship between artifacts and tags
@@ -61,4 +61,3 @@ CREATE TABLE artifact_tags (
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   PRIMARY KEY (artifact_id, tag_id)
 );
-

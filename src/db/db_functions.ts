@@ -26,7 +26,7 @@ export async function createArtifactWithTags(artifact: NewDisabilityArtifact, ta
     // Insert artifact -- trx is transaction
     const insertedArtifact = await trx
       .insertInto('disability_artifacts')
-      .values({ ...artifact, reviewed: false })
+      .values({ ...artifact })
       .returningAll()
       .executeTakeFirstOrThrow();
 
@@ -178,6 +178,63 @@ export async function reviewArtifact(artifactId: number, userId: number, status:
 
     return true;
   });
+}
+
+export async function getReviewComments(artifactId: number) {
+  return await db
+    .selectFrom('review_comments')
+    .innerJoin('users', 'users.user_id', 'review_comments.user_id')
+    .select([
+      'review_comments.comment_id',
+      'review_comments.artifact_id',
+      'review_comments.parent_comment_id',
+      'review_comments.user_id',
+      'review_comments.comment_text',
+      'review_comments.comment_date',
+      'review_comments.edited_at',
+      'users.username',
+    ])
+    .where('review_comments.artifact_id', '=', artifactId)
+    .orderBy('review_comments.comment_date', 'asc')
+    .execute();
+}
+
+export async function createReviewComment(
+  artifactId: number,
+  userId: number,
+  commentText: string,
+  parentCommentId: number | null = null,
+) {
+  if (parentCommentId !== null) {
+    const parent = await db
+      .selectFrom('review_comments')
+      .select('comment_id')
+      .where('comment_id', '=', parentCommentId)
+      .where('artifact_id', '=', artifactId)
+      .executeTakeFirst();
+    if (!parent) return null;
+  }
+
+  return await db
+    .insertInto('review_comments')
+    .values({
+      artifact_id: artifactId,
+      parent_comment_id: parentCommentId,
+      user_id: userId,
+      comment_text: commentText,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+}
+
+export async function updateReviewComment(commentId: number, userId: number, commentText: string) {
+  return await db
+    .updateTable('review_comments')
+    .set({ comment_text: commentText, edited_at: new Date() })
+    .where('comment_id', '=', commentId)
+    .where('user_id', '=', userId)
+    .returning(['comment_id'])
+    .executeTakeFirst();
 }
 
 export async function findUserByLogin(login: string) {

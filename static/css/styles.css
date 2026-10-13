@@ -114,18 +114,6 @@ main.container {
 .dataset-tile:focus-visible {
 	transform: translateY(-3px);
 }
-.dataset-detail {
-	border-top: 1px solid;
-	margin-top: 2rem;
-	padding-top: 3rem;
-}
-.dataset-detail h1 {
-	font-size: clamp(2.5rem, 7vw, 6.5rem);
-	letter-spacing: -0.04em;
-	line-height: .95;
-	max-width: 900px;
-}
-
 
 .detail-type {
 	font-size: 1.1rem;
@@ -173,21 +161,6 @@ main.container {
 	padding: .2rem .45rem;
 }
 
-.artifact-link {
-	display: inline-block;
-	font-size: 1.1rem;
-	font-weight: 700;
-}
-.artifact-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 1.5rem;
-}
-.artifact-link.secondary,
-.secondary {
-	font-size: .95rem;
-	font-weight: 500;
-}
 
 .submit-page {
 	border-top: 1px solid;
@@ -271,15 +244,21 @@ main.container {
 	padding-right: 5px;
 }
 .filter-chip_remove {
-    margin-bottom: 0;
-	padding-bottom: 5px;
-    line-height: 1;
-    --pico-form-element-spacing-vertical: 0.125rem;
-    --pico-form-element-spacing-horizontal: 0.375rem;
-	color: #686969;
-    border-radius: 50%;
-	background-color: transparent;
+  width: 23px;
+  height: 23px;
+  margin-bottom: 0;
+  padding: 4px;
+  border: 2px solid #eef5df;
+  border-radius: 50%;
+  background-color: #ff5248;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 10px;
+  margin-top: 3px;
 }
+
 [data-subject-filter] option:disabled {
     color: #9ca3af;
 }

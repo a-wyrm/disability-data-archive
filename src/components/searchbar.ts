@@ -10,7 +10,6 @@ export function SearchBar(searchValue = '') {
 			>
 				<input
 					id="dataset-search"
-					name="q"
 					class="tag-input"
 					type="search"
 					placeholder="Search datasets..."

@@ -10,6 +10,9 @@ docker compose up --build
 
 Open http://localhost:3000. PostgreSQL is initialized from `migrations/001_init.sql`.
 
+For databases initialized before review comments were added, apply
+`migrations/002_review_comments.sql` after the initial schema.
+
 The Docker Compose app connects to PostgreSQL using the `db` service name. The `db` hostname is only available inside the Compose network. For commands run directly on your host, set `DATABASE_URL` in `.env` to use `localhost` instead.
 
 To open a PostgreSQL shell in the Docker database:
@@ -17,6 +20,10 @@ To open a PostgreSQL shell in the Docker database:
 ```bash
 docker exec -it backend psql -U archive -d disability_archive
 ```
+
+Uploaded files are stored in the directory configured by `UPLOAD_DIRECTORY`.
+The default is `uploads` relative to the directory where the app is started.
+For local development, set `UPLOAD_DIRECTORY=./uploads` in `.env`.
 
 The `archive` role comes from `DB_USERNAME` in `.env`; if you change that value after the database volume has been initialized, the existing volume keeps the original role.
 

@@ -3,8 +3,9 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { statSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { basename, join, resolve } from 'node:path';
 import { Header } from './components/header.js';
-import { createArtifactWithTags, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getPendingArtifacts, reviewArtifact, searchArtifacts } from './db/db_functions.js';
+import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getPendingArtifacts, getReviewComments, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 import { clearSession, createSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
@@ -20,7 +21,9 @@ import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
 import { ReviewFilePage } from './pages/userPages/review_files.js';
 
-const uploadDirectory = './uploads';
+
+// upload stuff
+const uploadDirectory = resolve(process.env.UPLOAD_DIRECTORY ?? 'uploads');
 const maxUploadBytes = 10 * 1024 * 1024;
 const allowedExtensions = new Map([
   ['.csv', { type: 'csv', mimeTypes: ['text/csv', 'application/csv', 'application/vnd.ms-excel'] }],
@@ -55,23 +58,14 @@ function recordRows(records: ArtifactRecord[]) {
     }).join('');
 }
 
-function datasetTags(record: ArtifactRecord): string[] {
-  
-  const value = (record as ArtifactRecord & { tags?: unknown }).tags;
 
-  if (Array.isArray(value)) {
-    return value.filter((tag): tag is string => typeof tag === 'string');
-  }
-
-  return typeof value === 'string' ? value.split(',').map((tag) => tag.trim()).filter(Boolean) : [];
-}
 
 // HTMX stuff
 type Variables = { isHtmx: boolean };
 export const app = new Hono<{ Variables: Variables }>();
 const devStart = Date.now().toString();
-const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css'];
-function getDevRevision() {
+const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css', './static/css/header_styles.css', './static/css/user_pages.css'];
+export function getDevRevision() {
   const stylesheetRevisions = stylesheetPaths
     .map((stylesheetPath) => statSync(stylesheetPath).mtimeMs)
     .join('-');
@@ -127,7 +121,6 @@ function layout(content: string, isAuthenticated = false) {
     </html>`;
 }
 
-//TODO: Clean up filtered artifacts to be its own function
 app.get('/', async (c) => {
   const records = await getAllArtifacts();
 
@@ -280,27 +273,108 @@ app.get('/logout', (c) => {
 
 app.get('/userPages/review_list', async (c) => {
   const session = getSession(c);
-  if (!session) return c.redirect('/login');
+  if (!session) {
+    return c.redirect('/login');
+  }
   return c.html(layout(ReviewListPage(await getPendingArtifacts()), true));
 });
 
 app.get('/userPages/review_files/:id', async (c) => {
-  if (!getSession(c)) return c.redirect('/login');
+
+  // check to see if session exists
+  const session = getSession(c);
+  if (!session) {
+    return c.redirect('/login');
+  }
+
+  // check if id not found
   const id = Number(c.req.param('id'));
-  if (!Number.isInteger(id) || id < 1) return c.notFound();
+  if (!Number.isInteger(id) || id < 1) {
+    return c.notFound();
+  }
+
+  // check if artifact exists
   const artifact = await findPendingArtifact(id);
-  if (!artifact) return c.notFound();
-  return c.html(layout(ReviewFilePage(artifact), true));
+  if (!artifact) { 
+    return c.notFound();
+  }
+
+  return c.html(layout(ReviewFilePage(artifact, await getReviewComments(id), session.userId), true));
+});
+
+
+
+
+app.post('/userPages/review_files/:id/comments', async (c) => {
+
+  const session = getSession(c);
+  if (!session) {
+    return c.redirect('/login');
+  }
+
+  const id = Number(c.req.param('id'));
+  const body = await c.req.parseBody();
+  const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+  const rawParentId = typeof body.parent_comment_id === 'string' ? body.parent_comment_id : '';
+  const parentCommentId = rawParentId ? Number(rawParentId) : null;
+
+  if (!Number.isInteger(id) || id < 1 || !comment || comment.length > 5000
+    || (parentCommentId !== null && (!Number.isInteger(parentCommentId) || parentCommentId < 1))) {
+    return c.notFound();
+  }
+
+  if (!(await findPendingArtifact(id))){
+    return c.notFound();
+  }
+
+  if (!await createReviewComment(id, session.userId, comment, parentCommentId)){
+    return c.notFound();
+  }
+  return c.redirect(`/userPages/review_files/${id}`);
+});
+
+app.post('/userPages/review_files/comments/:commentId/edit', async (c) => {
+  const session = getSession(c);
+  if (!session){ 
+    return c.redirect('/login');
+  }
+
+  const commentId = Number(c.req.param('commentId'));
+  const body = await c.req.parseBody();
+  const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+
+  if (!Number.isInteger(commentId) || commentId < 1 || !comment || comment.length > 5000){
+    return c.notFound();
+  }
+
+  const updated = await updateReviewComment(commentId, session.userId, comment);
+  if (!updated){
+    return c.notFound();
+  }
+  return c.redirect(c.req.header('Referer') ?? '/userPages/review_list');
 });
 
 app.post('/userPages/review_files/:id', async (c) => {
   const session = getSession(c);
-  if (!session) return c.redirect('/login');
+  if (!session){
+    return c.redirect('/login');
+  }
   const id = Number(c.req.param('id'));
   const body = await c.req.parseBody();
   const decision = body.decision;
-  if (!Number.isInteger(id) || id < 1 || (decision !== 'approved' && decision !== 'denied')) return c.notFound();
-  await reviewArtifact(id, session.userId, decision);
+
+  if (!Number.isInteger(id) || id < 1 || (decision !== 'approved' && decision !== 'denied')) {
+    return c.notFound();
+  }
+
+  const dataset = decision === 'denied' ? await findPendingArtifact(id) : undefined;
+  const reviewed = await reviewArtifact(id, session.userId, decision);
+
+  if (decision === 'denied') {
+    if (reviewed && dataset?.file_path) {
+      await unlink(join(uploadDirectory, basename(dataset.file_path)));
+    }
+  }
   return c.redirect('/userPages/review_list');
 });
 
@@ -373,7 +447,7 @@ app.post('/submit', async (c) => {
 
   await mkdir(uploadDirectory, { recursive: true });
   const storedName = `${randomUUID()}${extension}`;
-  const storedPath = `${uploadDirectory}/${storedName}`;
+  const storedPath = join(uploadDirectory, storedName);
   try {
     await writeFile(storedPath, content, { flag: 'wx' });
     await createArtifactWithTags({

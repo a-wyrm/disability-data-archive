@@ -64,7 +64,7 @@ export function SubmitPage(message = "") {
                 chip.className = 'badge react';
 
                 const label = document.createElement('span');
-                label.className = 'filter-chip_remove';
+                label.className = 'filter-chip_label';
                 label.textContent = tag;
 
                 const remove = document.createElement('button');

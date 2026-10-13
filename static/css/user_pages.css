@@ -1,0 +1,89 @@
+.artifact-link {
+	display: inline-block;
+	font-size: 1.1rem;
+	padding-bottom: 5px;
+	font-weight: 700;
+}
+
+.artifact-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+}
+
+.artifact-link.secondary,
+.secondary {
+	font-size: .95rem;
+	font-weight: 500;
+}
+
+
+.dataset-detail {
+	border-top: 1px solid;
+	margin-top: 2rem;
+	padding-top: 3rem;
+}
+
+.dataset-detail h1 {
+	font-size: clamp(2.5rem, 7vw, 6.5rem);
+	letter-spacing: -0.04em;
+	line-height: .95;
+	max-width: 900px;
+}
+
+.decision {
+    --rectangle: #0e52b9;
+    --text: #fff;
+    --shadow: rgba(10, 22, 50, .24);
+    letter-spacing: 2px;
+    float: inline-end;
+    margin-left: 5px;
+    width: 150px !important;
+    overflow: hidden;
+    text-decoration: none;
+    background: #0f5aca;
+    border-radius: 0px;
+    box-shadow: 0 2px 8px -1px var(--shadow);
+    border-radius: 3px;
+
+}
+
+.review-comments {
+	margin-top: 3rem;
+	max-width: 760px;
+}
+.review-comment {
+	border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+	border-radius: .4rem;
+	margin: 1rem 0;
+	padding: 1rem;
+}
+.review-comment header {
+	display: flex;
+	gap: .75rem;
+	align-items: baseline;
+}
+.review-comment header time,
+.review-comment header span {
+	font-size: .8rem;
+	opacity: .7;
+}
+.review-comment p {
+	margin: .75rem 0;
+	overflow-wrap: anywhere;
+}
+.comment-actions {
+	display: flex;
+	gap: .5rem;
+}
+.comment-actions button {
+	font-size: .8rem;
+	margin: 0;
+	padding: .25rem .6rem;
+}
+.comment-edit-form textarea {
+	margin-top: .75rem;
+}
+.comment-mention {
+	color: var(--pico-primary);
+}

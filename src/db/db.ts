@@ -45,20 +45,32 @@ export interface ArtifactsReviewTable {
   review_ratings: number | null;
 }
 
+export interface ReviewCommentsTable {
+  comment_id: Generated<number>;
+  artifact_id: number;
+  parent_comment_id: number | null;
+  user_id: number;
+  comment_text: string;
+  comment_date: Generated<Date>;
+  edited_at: Date | null;
+}
+
 export interface Database {
   tags: TagsTable;
   disability_artifacts: DisabilityArtifactsTable;
   artifact_tags: ArtifactTagsTable;
   users: UsersTable;
   artifacts_review: ArtifactsReviewTable;
+  review_comments: ReviewCommentsTable;
 }
 
 export type Tag = Selectable<TagsTable>;
 export type NewTag = Insertable<TagsTable>;
 
 export type DisabilityArtifact = Selectable<DisabilityArtifactsTable>;
-export type NewDisabilityArtifact = Omit<Insertable<DisabilityArtifactsTable>, 'reviewed'>;
+export type NewDisabilityArtifact = Insertable<DisabilityArtifactsTable>;
 export type User = Selectable<UsersTable>;
+export type ReviewComment = Selectable<ReviewCommentsTable> & { username: string };
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,

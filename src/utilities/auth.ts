@@ -14,7 +14,9 @@ export async function hashPassword(password: string) {
 
 export async function verifyPassword(password: string, storedHash: string) {
   const [saltHex, keyHex] = storedHash.split(':');
-  if (!saltHex || !keyHex) return false;
+  if (!saltHex || !keyHex) {
+    return false;
+  }
   const derivedKey = await scrypt(password, Buffer.from(saltHex, 'hex'), 64) as Buffer;
   const expectedKey = Buffer.from(keyHex, 'hex');
   return derivedKey.length === expectedKey.length && timingSafeEqual(derivedKey, expectedKey);
@@ -29,7 +31,9 @@ export function createSession(userId: number, username: string) {
 export function getSession(c: Context) {
   const cookie = c.req.header('Cookie') ?? '';
   const token = cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('archive_session='))?.slice('archive_session='.length);
-  if (!token) return null;
+  if (!token) {
+    return null;
+  }
   const session = sessions.get(token);
   if (!session || session.expiresAt < Date.now()) {
     sessions.delete(token);
@@ -44,6 +48,8 @@ export function setSessionCookie(c: Context, token: string) {
 
 export function clearSession(c: Context) {
   const session = getSession(c);
-  if (session) sessions.delete(session.token);
+  if (session) {
+    sessions.delete(session.token);
+  }
   c.header('Set-Cookie', 'archive_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
 }
