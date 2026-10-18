@@ -20,20 +20,56 @@ CREATE TABLE users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE org_acronym (
+  id SERIAL PRIMARY KEY,
+  acronym VARCHAR(50) NOT NULL UNIQUE,
+  org_full VARCHAR(300) NOT NULL UNIQUE
+);
+
+
+-- insert orgs into org acronym table
+INSERT INTO org_acronym (acronym, org_full)
+VALUES
+  ('CDC',   'Centers for Disease Control and Prevention'),
+  ('FDA',   'Food and Drug Administration'),
+  ('NIH',   'National Institutes of Health'),
+  ('EPA',   'Environmental Protection Agency'),
+  ('FBI',   'Federal Bureau of Investigation'),
+  ('NASA',  'National Aeronautics and Space Administration'),
+  ('NOAA',  'National Oceanic and Atmospheric Administration'),
+  ('USDA',  'United States Department of Agriculture'),
+  ('HHS',   'Department of Health and Human Services'),
+  ('DHS',   'Department of Homeland Security'),
+  ('DOJ',   'Department of Justice'),
+  ('DOE',   'Department of Energy'),
+  ('DOL',   'Department of Labor'),
+  ('DOT',   'Department of Transportation'),
+  ('HUD',   'Department of Housing and Urban Development'),
+  ('VA',    'Department of Veterans Affairs'),
+  ('SSA',   'Social Security Administration'),
+  ('FEMA',  'Federal Emergency Management Agency'),
+  ('FCC',   'Federal Communications Commission'),
+  ('FTC',   'Federal Trade Commission'),
+  ('SEC',   'Securities and Exchange Commission'),
+  ('IRS',   'Internal Revenue Service'),
+  ('USPS',  'United States Postal Service'),
+  ('NIST',  'National Institute of Standards and Technology'),
+  ('NSF',   'National Science Foundation'),
+  ('OSHA',  'Occupational Safety and Health Administration');
+
 -- Main artifacts table
 CREATE TABLE disability_artifacts (
   id SERIAL PRIMARY KEY,
   artifact_type VARCHAR(50) NOT NULL, -- 'csv', 'xlsx', 'image', 'video', 'audio'
   file_path VARCHAR(512) NOT NULL, -- local path or S3 URL
   file_name VARCHAR(255) NOT NULL,
-  org_source VARCHAR(255) NOT NULL,
+  org_id VARCHAR(50) NOT NULL REFERENCES org_acronym(acronym),
   reviewed BOOLEAN NOT NULL DEFAULT FALSE,
   dataset_date VARCHAR(100), -- nullable; can be "unknown", "2024-01", "2023", etc.
   added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 
 -- artifacts review table
 CREATE TABLE artifacts_review (

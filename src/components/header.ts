@@ -16,22 +16,17 @@ export function Header(isAuthenticated = false) {
                     <li><a href="/submit">Submit</a></li>
                     <li><a href="/about">About</a></li>
                     <li>
-                        <div class="dropdown">
-                            <button 
-                                class="dropdown_button" 
-                                aria-haspopup="true" 
-                                aria-expanded="false" 
-                                id="dropdown-btn"> 
-                                Account Controls ↓
-                            </button>
-                            <div 
-                                class="dropdown-content" 
-                                role="menu" 
-                                aria-labelledby="dropdown-btn">
-                                <a href="${isAuthenticated ? '/userPages/review_list' : '/login'}" role="menuitem">${isAuthenticated ? 'Reviews' : 'Log in'}</a>
-                                ${isAuthenticated ? '<a href="/logout" role="menuitem">Log out</a>' : '<a href="/signup" role="menuitem">Sign up</a>'}
-                            </div>
-                        </div>
+                        <details class="dropdown">
+                            <summary>Account</summary>
+                            <fieldset class="dropdown-content" >
+                                <div class="year-fields"> 
+                                    <a href="${isAuthenticated ? '/userPages/review_list' : '/login'}" role="menuitem">${isAuthenticated ? 'Reviews' : 'Log in'}</a>
+                                </div>
+                                <div>
+                                    ${isAuthenticated ? '<a href="/logout" role="menuitem">Log out</a>' : '<a href="/signup" role="menuitem">Sign up</a>'}
+                                </div>
+                            </fieldset>
+                        </details>
                     </li>
                     <li>
                         ${SearchBar()}

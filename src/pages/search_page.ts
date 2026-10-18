@@ -22,7 +22,7 @@ export function SearchPage(artifacts: SearchResult[], searchValue: string) {
 				</h2>
 
 				<p>
-					${escapeHtml(artifact.org_source)}
+					${escapeHtml(artifact.org_id)}
 				</p>
 
 				<p>

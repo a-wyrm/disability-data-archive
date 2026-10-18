@@ -61,15 +61,41 @@ main.container {
 }
 
 
-.year-fields {
-	display: grid;
-	gap: .65rem;
-	grid-template-columns: 1fr 1fr;
-	margin-top: .7rem;
+
+
+.time-period-filter {
+	border: 1px solid var(--pico-muted-border-color);
+	margin: 1.5rem 0;
 }
-.year-fields input {
-	margin-top: .35rem;
-	padding-inline: .65rem;
+.time-period-filter summary {
+	background: var(--pico-muted-border-color);
+	font-size: 1.1rem;
+	font-weight: 700;
+	padding: .6rem .8rem;
+}
+
+.time-period-content {
+	padding: .7rem .8rem .8rem;
+}
+.time-period-content fieldset {
+	margin: 0;
+}
+.time-period-submit {
+	background: #444;
+	border-color: #444;
+	margin: .5rem 0 1rem .25rem;
+	padding: .55rem 1.25rem;
+	width: auto;
+}
+
+.time-period-hide {
+	background: transparent;
+	border: 0;
+	color: var(--pico-color);
+	display: block;
+	margin: 0 auto;
+	padding: .3rem .5rem;
+	width: auto;
 }
 
 

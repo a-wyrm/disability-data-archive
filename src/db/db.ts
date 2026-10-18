@@ -8,12 +8,18 @@ export interface TagsTable {
   created_at: Generated<Date>;
 }
 
+export interface OrgTable {
+  id: Generated<number>;
+  acronym: string;
+  org_full: string;
+}
+
 export interface DisabilityArtifactsTable {
   id: Generated<number>;
   artifact_type: string; // 'csv', 'xlsx', 'image', 'video', 'audio'
   file_path: string;
   file_name: string;
-  org_source: string;
+  org_id: string;
   reviewed: boolean;
   dataset_date: string | null;
   added_at: Generated<Date>;
@@ -57,6 +63,7 @@ export interface ReviewCommentsTable {
 
 export interface Database {
   tags: TagsTable;
+  org_acronym: OrgTable;
   disability_artifacts: DisabilityArtifactsTable;
   artifact_tags: ArtifactTagsTable;
   users: UsersTable;
@@ -66,6 +73,7 @@ export interface Database {
 
 export type Tag = Selectable<TagsTable>;
 export type NewTag = Insertable<TagsTable>;
+export type Organization = Selectable<OrgTable>;
 
 export type DisabilityArtifact = Selectable<DisabilityArtifactsTable>;
 export type NewDisabilityArtifact = Insertable<DisabilityArtifactsTable>;

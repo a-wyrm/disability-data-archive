@@ -5,7 +5,7 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
 import { Header } from './components/header.js';
-import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getPendingArtifacts, getReviewComments, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
+import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getHomeStats, getOrganizations, getPendingArtifacts, getReviewComments, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 import { clearSession, createSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
@@ -20,6 +20,7 @@ import { CreateAccountPage, accountError } from './pages/userPages/create_accoun
 import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
 import { ReviewFilePage } from './pages/userPages/review_files.js';
+import { HomePage } from './pages/home.js';
 
 
 // upload stuff
@@ -50,7 +51,7 @@ function recordRows(records: ArtifactRecord[]) {
         <article class="record-row">
           <div>
             <h2>${escapeHtml(record.file_name)}</h2>
-            <p>${escapeHtml(record.org_source)} · ${escapeHtml(record.artifact_type)}</p>
+            <p>${escapeHtml(record.org_id)} · ${escapeHtml(record.artifact_type)}</p>
           </div>
           <a href="${escapeHtml(artifactUrl)}">Open artifact</a>
         </article>
@@ -122,18 +123,7 @@ function layout(content: string, isAuthenticated = false) {
 }
 
 app.get('/', async (c) => {
-  const records = await getAllArtifacts();
-
-  const content = `
-    <section class="archive" aria-labelledby="archive-title">
-      <div class="section-heading">
-        <span class="count">${records.length.toString().padStart(2, '0')} entries</span>
-      </div>
-      <div id="record-list" class="record-list">${recordRows(records)}</div>
-    </section>
-  `;
-
-  return c.html(layout(content));
+  return c.html(layout(HomePage(await getHomeStats())));
 });
 
 app.get("/search", async (c) => {
@@ -222,7 +212,7 @@ app.get('/records', async (c) => {
   const records = query ? artifacts.filter((artifact) => [
       artifact.file_name,
       artifact.file_path,
-      artifact.org_source,
+      artifact.org_id,
       artifact.artifact_type,
       artifact.dataset_date,
     ].some((value) => value?.toLowerCase().includes(query.toLowerCase())))
@@ -380,7 +370,7 @@ app.post('/userPages/review_files/:id', async (c) => {
 
 
 // for submitting to db
-app.get('/submit', (c) => c.html(layout(SubmitPage())));
+app.get('/submit', async (c) => c.html(layout(SubmitPage(await getOrganizations()))));
 app.post('/submit', async (c) => {
 
   // TODO: prevent IP submission from same IP for at least 30 mins afterward 
@@ -388,7 +378,7 @@ app.post('/submit', async (c) => {
   const now = Date.now();
   const recentAttempts = (submissionAttempts.get(ip) ?? []).filter((time) => now - time < 60 * 60 * 1000);
   if (recentAttempts.length >= 5) {
-    return c.html(layout(SubmitPage(submitError('Too many submissions from this address. Please try again later.'))), 429);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Too many submissions from this address. Please try again later.'))), 429);
   }
   recentAttempts.push(now);
   submissionAttempts.set(ip, recentAttempts);
@@ -396,53 +386,71 @@ app.post('/submit', async (c) => {
   // get body -- all of it. hono function
   const body = await c.req.parseBody({ all: true });
   if (typeof body.website === 'string' && body.website.trim() !== '') {
-    return c.html(layout(SubmitPage(submitSuccess())));
+    return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess())));
   }
 
 
   // get names, ensure they are strings
   const fileName = typeof body.file_name === 'string' ? body.file_name.trim() : '';
-  const orgSource = typeof body.org_source === 'string' ? body.org_source.trim() : '';
+  const orgSelection = typeof body.org_id === 'string' ? body.org_id.trim() : '';
+  const otherOrgFull = typeof body.other_org_full === 'string' ? body.other_org_full.trim() : '';
+  const orgAcronym = typeof body.other_org_acronym === 'string' ? body.other_org_acronym.trim() : '';
   const datasetDate = typeof body.dataset_date === 'string' ? body.dataset_date.trim() : '';
   const file = body.artifact_file;
 
   const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
   console.log(body);
 
-  if (!fileName || !orgSource || !(file instanceof File)) {
-    return c.html(layout(SubmitPage(submitError('Enter a name, organization/source, and a file.'))), 400);
+  if (!fileName || !orgSelection || !(file instanceof File)) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter a name, organization/source, and a file.'))), 400);
   }
-  else if (fileName.length > 255 || orgSource.length > 255 || datasetDate.length > 100) {
-    return c.html(layout(SubmitPage(submitError('One or more fields are longer than allowed.'))), 400);
+  else if (fileName.length > 255 || orgSelection.length > 50 || otherOrgFull.length > 300 || orgAcronym.length > 50 || datasetDate.length > 100) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('One or more fields are longer than allowed.'))), 400);
+  }
+  else if (orgSelection === 'other' && !otherOrgFull) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter the full name of the organization.'))), 400);
+  }
+  else if (orgSelection === 'other' && !orgAcronym) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter an acronym for the organization.'))), 400);
   }
   else if (datasetDate && datasetDate.toLowerCase() !== 'unknown' && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(datasetDate)) {
-    return c.html(layout(SubmitPage(submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.'))), 400);
   }
   else if (file.size === 0 || file.size > maxUploadBytes) {
-    return c.html(layout(SubmitPage(submitError('The file must be between 1 byte and 10 MB.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The file must be between 1 byte and 10 MB.'))), 400);
   }
 
   const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
   const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
   const allowed = allowedExtensions.get(extension);
   if (!allowed || !allowed.mimeTypes.includes(file.type.toLowerCase())) {
-    return c.html(layout(SubmitPage(submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.'))), 400);
   }
 
   // verify inputs
   const content = Buffer.from(await file.arrayBuffer());
   if (extension === '.jpg' || extension === '.jpeg') {
     if (content[0] !== 0xff || content[1] !== 0xd8 || content[content.length - 2] !== 0xff || content[content.length - 1] !== 0xd9) {
-      return c.html(layout(SubmitPage(submitError('The JPG file contents do not match its extension.'))), 400);
+      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The JPG file contents do not match its extension.'))), 400);
     }
   } 
   else if (extension === '.png') {
     if (content.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
-      return c.html(layout(SubmitPage(submitError('The PNG file contents do not match its extension.'))), 400);
+      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The PNG file contents do not match its extension.'))), 400);
     }
   } 
   else if (content.includes(0)) {
-    return c.html(layout(SubmitPage(submitError('The CSV file contains binary data and could not be accepted.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The CSV file contains binary data and could not be accepted.'))), 400);
+  }
+
+  // add to organization database 
+  const resolvedOrg = await resolveOrganization(
+    orgSelection,
+    orgSelection === 'other' ? otherOrgFull : null,
+    orgAcronym || null,
+  );
+  if (!resolvedOrg) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid organization.'))), 400);
   }
 
   await mkdir(uploadDirectory, { recursive: true });
@@ -454,15 +462,16 @@ app.post('/submit', async (c) => {
       artifact_type: allowed.type,
       file_path: `/uploads/${storedName}`,
       file_name: fileName,
+      reviewed: false,
       dataset_date: datasetDate || null,
-      org_source: orgSource,
+      org_id: resolvedOrg,
     }, tags);
   }
 
   catch (error) {
     await unlink(storedPath).catch(() => undefined);
-    return c.html(layout(SubmitPage(submitError('The submission could not be saved. Please try again.'))), 500);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.'))), 500);
   }
 
-  return c.html(layout(SubmitPage(submitSuccess())));
+  return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess())));
 });

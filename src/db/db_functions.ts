@@ -1,9 +1,73 @@
-import { db, NewDisabilityArtifact } from "./db.js";
+import { db, NewDisabilityArtifact, Organization } from "./db.js";
+
+export async function getOrganizations(): Promise<Organization[]> {
+  return await db
+    .selectFrom('org_acronym')
+    .selectAll()
+    .orderBy('org_full', 'asc')
+    .execute();
+}
+
+
+export async function resolveOrganization(acronym: string, orgFull: string | null, orgAcr: string | null): Promise<string | null> {
+  return await db.transaction().execute(async (trx) => {
+    if (acronym !== 'other') {
+      const organization = await trx
+        .selectFrom('org_acronym')
+        .select('acronym')
+        .where('acronym', '=', acronym)
+        .executeTakeFirst();
+      return organization?.acronym ?? null;
+    }
+
+    if (!orgFull || !orgAcr) {
+      return null;
+    }
+
+    const existing = await trx
+      .selectFrom('org_acronym')
+      .select('acronym')
+      .where('org_full', '=', orgFull)
+      .executeTakeFirst();
+    if (existing) {
+      return existing.acronym;
+    }
+
+    // put org acronym -- if there isn't an existing acronym nor full name
+    if (acronym === 'other' && orgFull !== null && orgAcr !== null) {
+      await trx.insertInto('org_acronym').values({
+        acronym: orgAcr,
+        org_full: orgFull,
+      }).execute();
+
+      return orgAcr;
+    }
+
+    return null;
+  });
+}
 
 
 // Get list of artifacts
 export async function getAllArtifacts() {
   return await db.selectFrom('disability_artifacts').selectAll().where('reviewed', '=', true).execute();
+}
+
+export async function getHomeStats() {
+  const [datasets, volunteers] = await Promise.all([
+    db.selectFrom('disability_artifacts')
+      .select(({ fn }) => fn.count<number>('id').as('count'))
+      .where('reviewed', '=', true)
+      .executeTakeFirstOrThrow(),
+    db.selectFrom('users')
+      .select(({ fn }) => fn.count<number>('user_id').as('count'))
+      .executeTakeFirstOrThrow(),
+  ]);
+
+  return {
+    rescuedDatasets: Number(datasets.count),
+    volunteers: Number(volunteers.count),
+  };
 }
 
 export async function getPendingArtifacts() {
@@ -20,9 +84,12 @@ export async function getPendingArtifacts() {
     .execute();
 }
 
+
+
 // Create artifact w/ tags
 export async function createArtifactWithTags(artifact: NewDisabilityArtifact, tagNames: string[]) {
   return await db.transaction().execute(async (trx) => {
+
     // Insert artifact -- trx is transaction
     const insertedArtifact = await trx
       .insertInto('disability_artifacts')
@@ -74,7 +141,7 @@ export async function findArtifactsByOrgSource(orgSource: string) {
   return await db
     .selectFrom('disability_artifacts')
     .selectAll()
-    .where('org_source', '=', orgSource)
+    .where('org_id', '=', orgSource)
     .where('reviewed', '=', true)
     .execute();
 }
@@ -123,7 +190,7 @@ export async function searchArtifacts(query: string) {
 		request = request.where((eb) =>
 			eb.or([
 				eb('file_name', 'ilike', searchTerm),
-				eb('org_source', 'ilike', searchTerm),
+				eb('org_id', 'ilike', searchTerm),
 				eb('artifact_type', 'ilike', searchTerm),
         eb('tags.name', 'ilike', searchTerm),
 			])

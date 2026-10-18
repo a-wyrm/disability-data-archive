@@ -9,7 +9,7 @@ const dummyData: NewDisabilityArtifact = {
     file_name: "Disability Estimates",
     reviewed: true,
     dataset_date: "2023-01-28",
-    org_source: "CDC"
+    org_id: "CDC"
 } 
 
 const dummyData2: NewDisabilityArtifact = {
@@ -18,7 +18,7 @@ const dummyData2: NewDisabilityArtifact = {
     file_name: "Disability Employment",
     reviewed: true, 
     dataset_date: "2024-01-01",
-    org_source: "ACS"
+    org_id: "ACS"
 } 
 
 

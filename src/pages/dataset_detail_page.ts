@@ -5,7 +5,7 @@ type DatasetDetail = {
 	artifact_type: string;
 	file_path: string;
 	file_name: string;
-	org_source: string;
+	org_id: string;
 	dataset_date: string | null;
 	added_at: Date;
 	created_at: Date;
@@ -43,7 +43,7 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 				<div>
 					<h2>Dataset information</h2>
 					<dl class="detail-list">
-						<div><dt>Source</dt><dd>${escapeHtml(dataset.org_source)}</dd></div>
+						<div><dt>Source</dt><dd>${escapeHtml(dataset.org_id)}</dd></div>
 						<div><dt>File</dt><dd>${escapeHtml(dataset.file_name)}</dd></div>
 						<div><dt>Publication date</dt><dd>${escapeHtml(dataset.dataset_date ?? 'Unknown')}</dd></div>
 						<div><dt>Subject</dt><dd class="detail-tags">${tags}</dd></div>

@@ -29,8 +29,8 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 	const maxYear = parsedYears.length > 0 ? Math.max(...parsedYears) : minYear;
 	
 	const tagValue = filters.tag ?? '';
-	const fromValue = filters.from?.toString() ?? minYear;
-	const toValue = filters.to?.toString() ?? maxYear;
+	const fromValue = filters.from?.toString() ?? '';
+	const toValue = filters.to?.toString() ?? '';
 
 	const tiles = datasets.length === 0
 		? '<p class="empty">No datasets match these filters.</p>'
@@ -41,7 +41,7 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 					<span>${escapeHtml(dataset.dataset_date ?? 'Date unknown')}</span>
 				</div>
 				<div>
-					<p class="eyebrow">${escapeHtml(dataset.org_source)}</p>
+					<p class="eyebrow">${escapeHtml(dataset.org_id)}</p>
 					<h2>${escapeHtml(dataset.file_name)}</h2>
 					<p class="tile-description">${escapeHtml(dataset.artifact_type)}</p>
 				</div>
@@ -68,16 +68,38 @@ export async function DatasetPage(datasets: DisabilityArtifactsTable[], filters:
 				</div>
 				<form method="get" action="/datasets">
 					${FilterBySubject({ subjects: tags, selectedSubject: tagValue })}
-					<fieldset>
-						<legend>Publication year</legend>
-						<div class="year-fields">
-							<label for="from">From<input id="from" name="from" type="number" min="${minYear}" max="${maxYear}" value="${fromValue}" placeholder=""></label>
-							<label for="to">To<input id="to" name="to" type="number" min="${minYear}" max="${maxYear}" value="${toValue}" placeholder=""></label>
+					<details class="time-period-filter" open>
+						<summary>Time</summary>
+						<div class="time-period-content">
+							<fieldset>
+								<legend class="visually-hidden">Publication year</legend>
+								<div class="year-fields">
+									<label for="from">From<input id="from" name="from" type="number" min="${minYear}" max="${maxYear}" value="${fromValue}" placeholder="YYYY"></label>
+									<label for="to">To<input id="to" name="to" type="number" min="${minYear}" max="${maxYear}" value="${toValue}" placeholder="YYYY"></label>
+								</div>
+							</fieldset>
+							<button class="time-period-submit" type="submit">Submit</button>
+							<button class="time-period-hide" type="button" aria-label="Hide time period filter">⌃ <span>Hide</span></button>
 						</div>
-					</fieldset>
-					<button type="submit">Apply filters</button>
+					</details>
 					<a class="reset-link" href="/datasets">Reset filters</a>
 				</form>
+				<script>
+					(() => {
+						const timePeriod = document.querySelector('.time-period-filter');
+						const hideButton = timePeriod?.querySelector('.time-period-hide');
+						const summary = timePeriod?.querySelector('summary');
+						if (!(timePeriod instanceof HTMLDetailsElement)
+							|| !(hideButton instanceof HTMLButtonElement)
+							|| !(summary instanceof HTMLElement)) {
+							return;
+						}
+						hideButton.addEventListener('click', () => {
+							timePeriod.open = false;
+							summary.focus();
+						});
+					})();
+				</script>
 			</aside>
 			<section class="dataset-grid" aria-live="polite" aria-label="Dataset collection">
 				${tiles}
