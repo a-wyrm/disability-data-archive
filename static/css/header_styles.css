@@ -1,37 +1,66 @@
 .dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-.dropdown_button {
-    border: none;
-    color: var(--pico-primary);
-    padding: 14px 16px;
-    background-color: inherit;
-    font-family: inherit;
-    margin: 0;
-    cursor: pointer;
+  position: relative;
+  display: inline-block;
 }
 
 
+.account-controls {
+    border-radius: 5px;
+    background-color: white;
+}
+
+/* Visible trigger */
+.dropdown > summary {
+  list-style: none; /* Hide the default marker */
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  color: var(--pico-primary);
+  border-radius: 0.5rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dropdown > summary:hover,
+.dropdown > summary:focus-visible,
+.dropdown[open] > summary {
+  background-color: rgba(189, 192, 192, 0.808);
+  color: rgb(73, 177, 177);
+  outline: none;
+}
+
+/* Dropdown panel */
 .dropdown-content {
-    display: none; /* Hidden by default */
-    position: absolute;
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  min-width: 10rem;
+  margin: 0;
+  padding: 0.35rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1;
 }
 
-/* Trigger: Show if the .show class is present OR if any element inside is focused */
-.dropdown-content.show, 
-.dropdown:focus-within .dropdown-content {
-    display: block;
+.dropdown[open] .dropdown-content {
+  display: block;
 }
 
+/* Menu items */
 .dropdown-content a {
-    color: var(--pico-primary);
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    text-align: left;
+  display: block;
+  padding: 0.7rem 0.85rem;
+  color: var(--pico-primary);
+  text-decoration: none;
+  border-radius: 0.35rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dropdown-content a:hover,
+.dropdown-content a:focus-visible {
+  color: aqua;
+  outline: none;
 }

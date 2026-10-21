@@ -17,12 +17,12 @@ export function Header(isAuthenticated = false) {
                     <li><a href="/about">About</a></li>
                     <li>
                         <details class="dropdown">
-                            <summary>Account</summary>
+                            <summary style="color: var(--pico-primary);">Account</summary>
                             <fieldset class="dropdown-content" >
-                                <div class="year-fields"> 
+                                <div class="account-controls"> 
                                     <a href="${isAuthenticated ? '/userPages/review_list' : '/login'}" role="menuitem">${isAuthenticated ? 'Reviews' : 'Log in'}</a>
                                 </div>
-                                <div>
+                                <div class="account-controls">
                                     ${isAuthenticated ? '<a href="/logout" role="menuitem">Log out</a>' : '<a href="/signup" role="menuitem">Sign up</a>'}
                                 </div>
                             </fieldset>

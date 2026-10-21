@@ -15,10 +15,11 @@ export function FilterBySubject({ subjects, selectedSubject = '' }: SubjectFilte
         <div id="filters_active" aria-live="polite"></div>
 
         <label for="tag">Filters</label>
-        <select id="tag" name="tag" data-subject-filter>
+        <select id="tag" data-subject-filter>
             <option value="">All filters</option>
             ${options}
         </select>
+        <input id="selected-subjects" name="tag" type="hidden" value="${escapeHtml(selectedSubject)}">
 
         <script>
             (() => {
@@ -52,6 +53,10 @@ export function FilterBySubject({ subjects, selectedSubject = '' }: SubjectFilte
 
                     const updateTiles = () => {
                         const activeList = [...active];
+                        const selectedSubjects = document.getElementById('selected-subjects');
+                        if (selectedSubjects instanceof HTMLInputElement) {
+                            selectedSubjects.value = activeList.join(',');
+                        }
 
                         if (grid instanceof HTMLElement) {
                             let visibleCount = 0;

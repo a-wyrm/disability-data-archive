@@ -68,7 +68,6 @@ export function HomePage({ rescuedDatasets, volunteers }: HomeStats) {
 
     <section class="home-callout" aria-labelledby="home-callout-title">
       <div>
-        <p class="eyebrow">Data is at risk</p>
         <h2 id="home-callout-title">Know about disability data that should be preserved?</h2>
       </div>
       <a href="/submit">Submit a dataset</a>

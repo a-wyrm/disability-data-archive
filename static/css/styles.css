@@ -1,8 +1,3 @@
-main.container {
-	max-width: 1240px;
-	padding-bottom: 4rem;
-}
-
 .skip-link {
   position: absolute;
   width: 1px;
@@ -31,114 +26,10 @@ main.container {
   color: black;
 }
 
-.dataset-layout {
-	align-items: start;
-	display: grid;
-	gap: 2rem;
-	grid-template-columns: minmax(190px, 240px) 1fr;
-}
 
-.filter-panel {
-	padding-right: 2rem;
-	position: sticky;
-	top: 1rem;
-}
-.filter-panel h2 {
-	font-size: 1.45rem;
-	margin-bottom: 2rem;
-}
-.filter-panel label,
-.filter-panel legend {
-	font-size: .78rem;
-	font-weight: 700;
-	letter-spacing: .04em;
-	text-transform: uppercase;
-}
-.filter-panel fieldset {
-	border: 0;
-	margin: 1.5rem 0;
-	padding: 0;
-}
-
-
-
-
-.time-period-filter {
-	border: 1px solid var(--pico-muted-border-color);
-	margin: 1.5rem 0;
-}
-.time-period-filter summary {
-	background: var(--pico-muted-border-color);
-	font-size: 1.1rem;
-	font-weight: 700;
-	padding: .6rem .8rem;
-}
-
-.time-period-content {
-	padding: .7rem .8rem .8rem;
-}
-.time-period-content fieldset {
-	margin: 0;
-}
-.time-period-submit {
-	background: #444;
-	border-color: #444;
-	margin: .5rem 0 1rem .25rem;
-	padding: .55rem 1.25rem;
-	width: auto;
-}
-
-.time-period-hide {
-	background: transparent;
-	border: 0;
-	color: var(--pico-color);
-	display: block;
-	margin: 0 auto;
-	padding: .3rem .5rem;
-	width: auto;
-}
-
-
-.visually-hidden {
-	border: 0;
-	clip: rect(0 0 0 0);
-	height: 1px;
-	margin: -1px;
-	overflow: hidden;
-	padding: 0;
-	position: absolute;
-	white-space: nowrap;
-	width: 1px;
-}
-
-
-.reset-link {
-	display: block;
-	font-size: .8rem;
-	margin-top: 1rem;
-	text-align: center;
-}
-
-
-.dataset-grid {
-	display: grid;
-	gap: 1rem;
-	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-}
-.dataset-tile {
-	aspect-ratio: 1 / 1;
-	color: inherit;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-	margin: 0;
-	min-width: 0;
-	padding: 1.25rem;
-	transition: background .2s ease, border-color .2s ease, transform .2s ease;
-}
-.dataset-tile:hover,
-.dataset-tile:focus-visible {
-	transform: translateY(-3px);
+main.container {
+	max-width: 1240px;
+	padding-bottom: 4rem;
 }
 
 .detail-type {
@@ -232,20 +123,6 @@ main.container {
 }
 
 
-
-.tile-topline,
-.dataset-tile footer {
-	display: flex;
-	font-size: .72rem;
-	justify-content: space-between;
-	letter-spacing: .04em;
-	text-transform: uppercase;
-}
-.dataset-tile h2 {
-	font-size: clamp(1.25rem, 2vw, 1.7rem);
-	line-height: 1.05;
-	margin-bottom: .75rem;
-}
 
 
 /* Subject filter chips */
