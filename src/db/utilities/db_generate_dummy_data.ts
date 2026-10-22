@@ -9,7 +9,10 @@ const dummyData: NewDisabilityArtifact = {
     file_name: "Disability Estimates",
     reviewed: true,
     dataset_date: "2023-01-28",
-    org_id: "CDC"
+    org_id: "CDC",
+    dataset_description: "cool dataset",
+    dataset_kind: "public",
+    dataset_status: "available"
 } 
 
 const dummyData2: NewDisabilityArtifact = {
@@ -18,7 +21,9 @@ const dummyData2: NewDisabilityArtifact = {
     file_name: "Disability Employment",
     reviewed: true, 
     dataset_date: "2024-01-01",
-    org_id: "ACS"
+    org_id: "ACS",
+    dataset_kind: "public",
+    dataset_status: "available"
 } 
 
 

@@ -68,7 +68,10 @@ CREATE TABLE disability_artifacts (
   dataset_date VARCHAR(100), -- nullable; can be "unknown", "2024-01", "2023", etc.
   added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  dataset_description VARCHAR(12000),
+  dataset_kind VARCHAR(300), -- private or public dataset
+  dataset_status VARCHAR(20) -- discontinued, removed, available, study, unknown
 );
 
 -- artifacts review table

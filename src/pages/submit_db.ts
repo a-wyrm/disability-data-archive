@@ -37,6 +37,29 @@ export function SubmitPage(organizations: Organization[], message = "") {
           <input id="dataset_date" name="dataset_date" type="text" maxlength="100" placeholder="YYYY, YYYY-MM, or YYYY-MM-DD">
         </label>
 
+        <label for="dataset_description">Dataset description <small>(optional)</small>
+          <textarea id="dataset_description" name="dataset_description" maxlength="12000" rows="5"></textarea>
+        </label>
+
+        <label for="dataset_kind">Dataset access
+          <select id="dataset_kind" name="dataset_kind" required>
+            <option value="">Select access</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+        </label>
+
+        <label for="dataset_status">Dataset status
+          <select id="dataset_status" name="dataset_status" required>
+            <option value="">Select status</option>
+            <option value="available">Available</option>
+            <option value="study">Study</option>
+            <option value="discontinued">Discontinued</option>
+            <option value="removed">Removed</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+
         <label for="tags_input">Tags</label>
         <div id="tags" aria-live="polite"></div>
         <input id="tags_input" type="text" maxlength="25" autocomplete="off" placeholder="Type a tag and press Enter">
@@ -55,7 +78,6 @@ export function SubmitPage(organizations: Organization[], message = "") {
       </form>
 
       <script>
-
         const tagsInput = document.getElementById('tags_input');
         const tagList = document.getElementById('tags');
         const organizationSelect = document.getElementById('org_id');

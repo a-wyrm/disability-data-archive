@@ -3,7 +3,7 @@ import { SearchBar } from "./searchbar.js";
 import { getDevRevision } from "../app.js";
 
 
-export function Header(isAuthenticated = false) {
+export function Header(isAuthenticated: boolean) {
   return `
         <link rel="stylesheet" href="/static/css/header_styles.css?v=${getDevRevision()}">
         <header class="container">

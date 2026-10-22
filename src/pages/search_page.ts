@@ -7,33 +7,30 @@ type SearchResult = DisabilityArtifact & {
 
 export function SearchPage(artifacts: SearchResult[], searchValue: string) {
 	const results = artifacts.length === 0
-		? `
-			<p class="empty">
-				No datasets found for
-				<strong>${escapeHtml(searchValue)}</strong>.
+		? `<p class="empty">
+			No datasets found for
+			<strong>${escapeHtml(searchValue)}</strong>.
+		</p>`
+		: artifacts.map((artifact) => `<article class="dataset-result">
+			<h2>
+				<a href="/datasets/${artifact.id}">
+					${escapeHtml(artifact.file_name)}
+				</a>
+			</h2>
+
+			<p>
+				${escapeHtml(artifact.org_id)}
 			</p>
-		`
-		: artifacts.map((artifact) => `
-			<article class="dataset-result">
-				<h2>
-					<a href="/datasets/${artifact.id}">
-						${escapeHtml(artifact.file_name)}
-					</a>
-				</h2>
 
+			<p>
+				${escapeHtml(artifact.artifact_type)}
+			</p>
+
+			${artifact.tags.length > 0 ? `
 				<p>
-					${escapeHtml(artifact.org_id)}
+					${artifact.tags.map((tag) => escapeHtml(tag.name)).join(" · ")}
 				</p>
-
-				<p>
-					${escapeHtml(artifact.artifact_type)}
-				</p>
-
-				${artifact.tags.length > 0 ? `
-					<p>
-						${artifact.tags.map((tag) => escapeHtml(tag.name)).join(" · ")}
-					</p>
-				` : ""}
+			` : ""}
 			</article>
 		`).join("");
 

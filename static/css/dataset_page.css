@@ -54,15 +54,6 @@
 	padding: .55rem 1.25rem;
 	width: auto;
 }
-.time-period-hide {
-	background: transparent;
-	border: 0;
-	color: var(--pico-color);
-	display: block;
-	margin: 0 auto;
-	padding: .3rem .5rem;
-	width: auto;
-}
 
 
 .visually-hidden {

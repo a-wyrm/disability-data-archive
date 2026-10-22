@@ -25,6 +25,9 @@ export interface DisabilityArtifactsTable {
   added_at: Generated<Date>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+  dataset_description: string | null;
+  dataset_kind: string;
+  dataset_status: string;
 }
 
 export interface ArtifactTagsTable {
@@ -41,6 +44,14 @@ export interface UsersTable {
   flag_amount: Generated<number>;
   is_locked: Generated<boolean>;
   created_at: Generated<Date>;
+}
+
+export interface UserCookiesTable {
+  cookie_id: Generated<number>;
+  user_id: number;
+  token_hash: string;
+  created_at: Generated<Date>;
+  expires_at: Date;
 }
 
 export interface ArtifactsReviewTable {
@@ -67,6 +78,7 @@ export interface Database {
   disability_artifacts: DisabilityArtifactsTable;
   artifact_tags: ArtifactTagsTable;
   users: UsersTable;
+  user_cookies: UserCookiesTable;
   artifacts_review: ArtifactsReviewTable;
   review_comments: ReviewCommentsTable;
 }

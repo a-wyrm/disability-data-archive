@@ -1,5 +1,7 @@
 # Disability Data Archive
 
+This is the repository for the disability data archive run by the American Association of People with Disabilities.
+All webpages are run server-side. 
 
 ## Run with Docker
 
@@ -12,6 +14,9 @@ Open http://localhost:3000. PostgreSQL is initialized from `migrations/001_init.
 
 For databases initialized before review comments were added, apply
 `migrations/002_review_comments.sql` after the initial schema.
+
+For databases initialized before persistent login sessions were added, apply
+`migrations/003_user_cookies.sql` after the initial schema.
 
 The Docker Compose app connects to PostgreSQL using the `db` service name. The `db` hostname is only available inside the Compose network. For commands run directly on your host, set `DATABASE_URL` in `.env` to use `localhost` instead.
 

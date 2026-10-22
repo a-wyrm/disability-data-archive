@@ -8,7 +8,6 @@ export async function getOrganizations(): Promise<Organization[]> {
     .execute();
 }
 
-
 export async function resolveOrganization(acronym: string, orgFull: string | null, orgAcr: string | null): Promise<string | null> {
   return await db.transaction().execute(async (trx) => {
     if (acronym !== 'other') {
@@ -47,7 +46,6 @@ export async function resolveOrganization(acronym: string, orgFull: string | nul
   });
 }
 
-
 // Get list of artifacts
 export async function getAllArtifacts() {
   return await db.selectFrom('disability_artifacts').selectAll().where('reviewed', '=', true).execute();
@@ -83,7 +81,6 @@ export async function getPendingArtifacts() {
     .orderBy('added_at', 'asc')
     .execute();
 }
-
 
 
 // Create artifact w/ tags
@@ -170,10 +167,7 @@ export async function findArtifactWithTags(artifactId: number) {
   };
 }
 
-
-
 export async function searchArtifacts(query: string) {
-
 	const words = query.trim().split(/\s+/).filter(Boolean);
   let request = db
     .selectFrom('disability_artifacts')
@@ -214,7 +208,39 @@ export async function findPendingArtifact(artifactId: number) {
     .executeTakeFirst();
 }
 
-export async function reviewArtifact(artifactId: number, userId: number, status: 'approved' | 'denied') {
+// Review edits for each artifact
+export interface ArtifactReviewEdits {
+  dataset_description: string | null;
+  created_at: Date;
+  dataset_kind: string;
+  dataset_status: string;
+  org_id: string;
+  tags: string[];
+}
+
+export async function getUserById(userId: number) {
+  return await db
+    .selectFrom('users')
+    .select(['user_id', 'reputation', 'is_locked'])
+    .where('user_id', '=', userId)
+    .executeTakeFirst();
+}
+
+export async function getPendingArtifactTags(artifactId: number) {
+  return await db
+    .selectFrom('artifact_tags')
+    .innerJoin('tags', 'tags.id', 'artifact_tags.tag_id')
+    .select(['tags.id', 'tags.name'])
+    .where('artifact_tags.artifact_id', '=', artifactId)
+    .execute();
+}
+
+export async function reviewArtifact(
+  artifactId: number,
+  userId: number,
+  status: 'approved' | 'denied',
+  edits?: ArtifactReviewEdits,
+) {
   return await db.transaction().execute(async (trx) => {
     const artifact = await trx
       .selectFrom('disability_artifacts')
@@ -228,7 +254,38 @@ export async function reviewArtifact(artifactId: number, userId: number, status:
       )))
       .executeTakeFirst();
 
-    if (!artifact) return false;
+    if (status === 'approved' && edits) {
+      await trx
+        .updateTable('disability_artifacts')
+        .set({
+          dataset_description: edits.dataset_description,
+          created_at: edits.created_at,
+          dataset_kind: edits.dataset_kind,
+          dataset_status: edits.dataset_status,
+          org_id: edits.org_id,
+        })
+        .where('id', '=', artifactId)
+        .execute();
+
+      await trx.deleteFrom('artifact_tags').where('artifact_id', '=', artifactId).execute();
+      for (const tagName of edits.tags) {
+        const tag = await trx
+          .insertInto('tags')
+          .values({ name: tagName })
+          .onConflict((oc) => oc.column('name').doNothing())
+          .returning('id')
+          .executeTakeFirst();
+        const tagId = tag?.id ?? (await trx
+          .selectFrom('tags')
+          .select('id')
+          .where('name', '=', tagName)
+          .executeTakeFirstOrThrow()).id;
+        await trx.insertInto('artifact_tags')
+          .values({ artifact_id: artifactId, tag_id: tagId })
+          .onConflict((oc) => oc.doNothing())
+          .execute();
+      }
+    }
 
     await trx.insertInto('artifacts_review').values({
       artifact_id: artifactId,
@@ -242,6 +299,14 @@ export async function reviewArtifact(artifactId: number, userId: number, status:
       .set({ reviewed: status === 'approved', updated_at: new Date() })
       .where('id', '=', artifactId)
       .execute();
+
+    if (status === 'approved') {
+      await trx
+        .updateTable('users')
+        .set(({ eb }) => ({ reputation: eb('reputation', '+', 1) }))
+        .where('user_id', '=', userId)
+        .execute();
+    }
 
     return true;
   });

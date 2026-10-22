@@ -4,10 +4,12 @@ import { statSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
+
+// components
 import { Header } from './components/header.js';
-import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getHomeStats, getOrganizations, getPendingArtifacts, getReviewComments, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
+import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
-import { clearSession, createSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
+import { clearSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
 // pages
 import { DatasetPage, type DatasetFilters } from './pages/dataset_page.js';
@@ -64,6 +66,13 @@ function recordRows(records: ArtifactRecord[]) {
 // HTMX stuff
 type Variables = { isHtmx: boolean };
 export const app = new Hono<{ Variables: Variables }>();
+app.use('*', async (c, next) => {
+  c.set('isHtmx', c.req.header('HX-Request') === 'true');
+  await next();
+});
+
+// CSS sheets need to be re-rendered on pages when they are updated
+// this code block syncs the most recent version of the css files to display the most recent version
 const devStart = Date.now().toString();
 const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css', './static/css/header_styles.css', './static/css/user_pages.css'];
 export function getDevRevision() {
@@ -73,18 +82,23 @@ export function getDevRevision() {
   return `${devStart}-${stylesheetRevisions}`;
 }
 
-app.use('*', async (c, next) => {
-  c.set('isHtmx', c.req.header('HX-Request') === 'true');
-  await next();
-});
+
+function checkAuth(result: string | undefined) {
+  if (result != null) {
+    return true;
+  }
+
+  return false;
+}
 
 // static files
 app.use('/static/*', serveStatic({ root: './' }));
 app.use('/uploads/*', serveStatic({ root: './' }));
 app.get('/__dev/revision', (c) => c.text(getDevRevision()));
 
-// start page skip content
-function layout(content: string, isAuthenticated = false) {
+// The function that actually lays out the html content
+// includes the skip main content field
+function layout(content: string, isAuthenticated: boolean) {
   return `
   <!doctype html>
     <html lang="en">
@@ -98,20 +112,6 @@ function layout(content: string, isAuthenticated = false) {
           href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css"
         >
         <link rel="stylesheet" href="/static/css/styles.css?v=${getDevRevision()}">
-
-        <script>
-          (() => {
-            const revision = '${getDevRevision()}';
-            setInterval(async () => {
-              try {
-                const response = await fetch('/__dev/revision', { cache: 'no-store' });
-                if ((await response.text()) !== revision) window.location.reload();
-              } catch {
-                // The server may be restarting after a source change.
-              }
-            }, 500);
-          })();
-        </script>
     </head>
     <body>
         <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -120,16 +120,38 @@ function layout(content: string, isAuthenticated = false) {
         ${content}
         </main>
     </body>
-    </html>`;
+    </html>
+    <script>
+      (() => {
+        const revision = '${getDevRevision()}';
+        setInterval(async () => {
+          try {
+            const response = await fetch('/__dev/revision', { cache: 'no-store' });
+            if ((await response.text()) !== revision) window.location.reload();
+          } 
+          catch {
+            // The server may be restarting after a source change.
+          }
+        }, 500);
+      })();
+    </script>`;
 }
 
 app.get('/', async (c) => {
-  return c.html(layout(HomePage(await getHomeStats())));
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
+
+  return c.html(layout(HomePage(await getHomeStats()), res));
 });
 
 // search
 app.get("/search", async (c) => {
+
+  // search context can change especially for the db filtering
 	const searchValue = c.req.query("q") ?? "";
+
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
 
   const artifacts = await searchArtifacts(searchValue);
   const results = await Promise.all(artifacts.map(async (artifact) => {
@@ -140,17 +162,17 @@ app.get("/search", async (c) => {
     };
   }));
 
-  return c.html(layout(SearchPage(results, searchValue)));
+  return c.html(layout(SearchPage(results, searchValue), res));
 });
 
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
   const taggedArtifacts = await Promise.all(artifacts.map((artifact) => findArtifactWithTags(Number(artifact.id))));
+
+  // map artifacts to their tags
   const tagsByArtifactId = new Map(
-    taggedArtifacts
-      .filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null)
-      .map((artifact) => [artifact.id, artifact.tags.map((tag) => tag.name)])
+    taggedArtifacts.filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null).map((artifact) => [artifact.id, artifact.tags.map((tag) => tag.name)])
   );
 
   const rawFrom = Number(c.req.query('from'));
@@ -209,11 +231,13 @@ app.get('/datasets', async (c) => {
   // filters are the start, end, recency, agency, and year they were published
   // specifically, the artifacts dataset and organization db
   // because id is generated by the db we pass unknown to parameter 1
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
   return c.html(layout(await DatasetPage(
     filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
     filters,
     { allDatasets: artifacts as unknown as Parameters<typeof DatasetPage>[0], organizations},
-  )));
+  ), res));
 });
 
 // show dataset with specific id
@@ -228,7 +252,10 @@ app.get('/datasets/:id', async (c) => {
     return c.notFound();
   }
 
-  return c.html(layout(DatasetDetailPage(dataset)));
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
+
+  return c.html(layout(DatasetDetailPage(dataset), res));
 });
 
 app.get('/datasets/:id/view', async (c) => {
@@ -247,7 +274,9 @@ app.get('/datasets/:id/view', async (c) => {
     return c.redirect(`/datasets/${id}`);
   }
 
-  return c.html(layout(CsvViewer(dataset, getDevRevision())));
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
+  return c.html(layout(CsvViewer(dataset, getDevRevision()), res));
 });
 
 app.get('/records', async (c) => {
@@ -267,49 +296,57 @@ app.get('/records', async (c) => {
 
 // about page
 app.get('/about', async (c) => {
-  return c.html(layout(AboutPage()));
+  const session = await getSession(c);
+  const res = checkAuth(session?.token); 
+  return c.html(layout(AboutPage(), res));
 });
 
 
 // signup page functionality
-app.get('/signup', (c) => c.html(layout(CreateAccountPage(), Boolean(getSession(c)))));
+app.get('/signup', async (c) => c.html(layout(CreateAccountPage(), Boolean(await getSession(c)))));
 app.post('/signup', async (c) => {
+
   const body = await c.req.parseBody();
   const username = typeof body.username === 'string' ? body.username.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
+
   if (!/^[a-zA-Z0-9_]{3,100}$/.test(username) || !/^\S+@\S+\.\S+$/.test(email) || password.length < 12) {
-    return c.html(layout(CreateAccountPage(accountError('Use a valid username, email, and a password of at least 12 characters.'))), 400);
+    return c.html(layout(CreateAccountPage(accountError('Use a valid username, email, and a password of at least 12 characters.')), false), 400);
   }
+  
   try {
     const user = await createUser(username, email, await hashPassword(password));
-    setSessionCookie(c, createSession(user.user_id, user.username));
-    return c.redirect('/userPages/review_list');
-  } catch {
-    return c.html(layout(CreateAccountPage(accountError('That username or email is already in use.'))), 409);
+    await setSessionCookie(c, user.user_id);
+    return c.redirect('/');
+  } 
+  catch {
+    return c.html(layout(CreateAccountPage(accountError('That username or email is already in use.')), false), 409);
   }
 });
 
-app.get('/login', (c) => c.html(layout(LoginPage(), Boolean(getSession(c)))));
+app.get('/login', async (c) => c.html(layout(LoginPage(), Boolean(await getSession(c)))));
 app.post('/login', async (c) => {
   const body = await c.req.parseBody();
   const login = typeof body.login === 'string' ? body.login.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
   const user = await findUserByLogin(login);
   if (!user || user.is_locked || !(await verifyPassword(password, user.password_hash))) {
-    return c.html(layout(LoginPage(loginError('The login details are not valid.'))), 401);
+    return c.html(layout(LoginPage(loginError('The login details are not valid.')), false), 401);
   }
-  setSessionCookie(c, createSession(user.user_id, user.username));
-  return c.redirect('/userPages/review_list');
+
+  // this sets the cookie
+  await setSessionCookie(c, user.user_id);
+  return c.redirect('/');
 });
 
-app.get('/logout', (c) => {
-  clearSession(c);
+app.get('/logout', async (c) => {
+  await clearSession(c);
   return c.redirect('/');
 });
 
 app.get('/userPages/review_list', async (c) => {
-  const session = getSession(c);
+  const session = await getSession(c);
   if (!session) {
     return c.redirect('/login');
   }
@@ -319,7 +356,7 @@ app.get('/userPages/review_list', async (c) => {
 app.get('/userPages/review_files/:id', async (c) => {
 
   // check to see if session exists
-  const session = getSession(c);
+  const session = await getSession(c);
   if (!session) {
     return c.redirect('/login');
   }
@@ -336,7 +373,19 @@ app.get('/userPages/review_files/:id', async (c) => {
     return c.notFound();
   }
 
-  return c.html(layout(ReviewFilePage(artifact, await getReviewComments(id), session.userId), true));
+  const [user, organizations, tags] = await Promise.all([
+    getUserById(session.userId),
+    getOrganizations(),
+    getPendingArtifactTags(id),
+  ]);
+  return c.html(layout(ReviewFilePage(
+    artifact,
+    await getReviewComments(id),
+    session.userId,
+    user?.reputation ?? 0,
+    organizations,
+    tags.map((tag) => tag.name),
+  ), true));
 });
 
 
@@ -344,7 +393,7 @@ app.get('/userPages/review_files/:id', async (c) => {
 
 app.post('/userPages/review_files/:id/comments', async (c) => {
 
-  const session = getSession(c);
+  const session = await getSession(c);
   if (!session) {
     return c.redirect('/login');
   }
@@ -371,7 +420,7 @@ app.post('/userPages/review_files/:id/comments', async (c) => {
 });
 
 app.post('/userPages/review_files/comments/:commentId/edit', async (c) => {
-  const session = getSession(c);
+  const session = await getSession(c);
   if (!session){ 
     return c.redirect('/login');
   }
@@ -392,7 +441,7 @@ app.post('/userPages/review_files/comments/:commentId/edit', async (c) => {
 });
 
 app.post('/userPages/review_files/:id', async (c) => {
-  const session = getSession(c);
+  const session = await getSession(c);
   if (!session){
     return c.redirect('/login');
   }
@@ -404,8 +453,40 @@ app.post('/userPages/review_files/:id', async (c) => {
     return c.notFound();
   }
 
+  // users need at least 50 rep to click the approve or deny button
+  const user = await getUserById(session.userId);
+  if (!user || user.is_locked || user.reputation <= 49) {
+    return c.text('You do not have enough reputation to review datasets.', 403);
+  }
+
+  let edits;
+  if (decision === 'approved') {
+    const description = typeof body.dataset_description === 'string' ? body.dataset_description.trim() : '';
+    const createdAtValue = typeof body.created_at === 'string' ? body.created_at : '';
+    const createdAt = new Date(createdAtValue);
+    const datasetKind = typeof body.dataset_kind === 'string' ? body.dataset_kind : '';
+    const datasetStatus = typeof body.dataset_status === 'string' ? body.dataset_status : '';
+    const orgId = typeof body.org_id === 'string' ? body.org_id : '';
+    const tags = typeof body.tags === 'string' ? [...new Set(body.tags.split(',').map((tag) => tag.trim()).filter(Boolean))] : [];
+    const organizations = await getOrganizations();
+    const validOrg = organizations.some((organization) => organization.acronym === orgId);
+
+    if (!createdAtValue || Number.isNaN(createdAt.getTime())|| !['public', 'private'].includes(datasetKind) || !['available', 'study', 'discontinued', 'removed', 'unknown'].includes(datasetStatus) || !validOrg || tags.some((tag) => tag.length > 25) || tags.length > 80 || description.length > 12000) {
+      return c.text('The review edits are invalid.', 400);
+    }
+
+    edits = {
+      dataset_description: description || null,
+      created_at: createdAt,
+      dataset_kind: datasetKind,
+      dataset_status: datasetStatus,
+      org_id: orgId,
+      tags,
+    };
+  }
+
   const dataset = decision === 'denied' ? await findPendingArtifact(id) : undefined;
-  const reviewed = await reviewArtifact(id, session.userId, decision);
+  const reviewed = await reviewArtifact(id, session.userId, decision, edits);
 
   if (decision === 'denied') {
     if (reviewed && dataset?.file_path) {
@@ -417,7 +498,14 @@ app.post('/userPages/review_files/:id', async (c) => {
 
 
 // for submitting to db
-app.get('/submit', async (c) => c.html(layout(SubmitPage(await getOrganizations()))));
+app.get('/submit', async (c) => {
+
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
+
+  return c.html(layout(SubmitPage(await getOrganizations()), res));
+});
+
 app.post('/submit', async (c) => {
 
   // TODO: prevent IP submission from same IP for at least 30 mins afterward 
@@ -425,7 +513,10 @@ app.post('/submit', async (c) => {
   const now = Date.now();
   const recentAttempts = (submissionAttempts.get(ip) ?? []).filter((time) => now - time < 60 * 60 * 1000);
   if (recentAttempts.length >= 5) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Too many submissions from this address. Please try again later.'))), 429);
+    const session = await getSession(c);
+    const res = checkAuth(session?.token);
+
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Too many submissions from this address. Please try again later.')), res), 429);
   }
   recentAttempts.push(now);
   submissionAttempts.set(ip, recentAttempts);
@@ -433,7 +524,9 @@ app.post('/submit', async (c) => {
   // get body -- all of it. hono function
   const body = await c.req.parseBody({ all: true });
   if (typeof body.website === 'string' && body.website.trim() !== '') {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess())));
+    const session = await getSession(c);
+    const res = checkAuth(session?.token);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess()), res));
   }
 
 
@@ -443,51 +536,61 @@ app.post('/submit', async (c) => {
   const otherOrgFull = typeof body.other_org_full === 'string' ? body.other_org_full.trim() : '';
   const orgAcronym = typeof body.other_org_acronym === 'string' ? body.other_org_acronym.trim() : '';
   const datasetDate = typeof body.dataset_date === 'string' ? body.dataset_date.trim() : '';
+  const datasetDescription = typeof body.dataset_description === 'string' ? body.dataset_description.trim() : '';
+  const datasetKind = typeof body.dataset_kind === 'string' ? body.dataset_kind.trim() : '';
+  const datasetStatus = typeof body.dataset_status === 'string' ? body.dataset_status.trim() : '';
   const file = body.artifact_file;
 
   const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
-  console.log(body);
+  const session = await getSession(c);
+  const res = checkAuth(session?.token);
 
-  if (!fileName || !orgSelection || !(file instanceof File)) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter a name, organization/source, and a file.'))), 400);
+  if (!fileName || !orgSelection || !datasetKind || !datasetStatus || !(file instanceof File)) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter a name, organization/source, dataset access, dataset status, and a file.')), res), 400);
   }
-  else if (fileName.length > 255 || orgSelection.length > 50 || otherOrgFull.length > 300 || orgAcronym.length > 50 || datasetDate.length > 100) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('One or more fields are longer than allowed.'))), 400);
+  else if (fileName.length > 255 || orgSelection.length > 50 || otherOrgFull.length > 300 || orgAcronym.length > 50 || datasetDate.length > 100 || datasetDescription.length > 12000 || datasetKind.length > 300 || datasetStatus.length > 20) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('One or more fields are longer than allowed.')), res), 400);
+  }
+  else if (!['public', 'private'].includes(datasetKind)) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select whether the dataset is public or private.')), res), 400);
+  }
+  else if (!['discontinued', 'removed', 'available', 'study', 'unknown'].includes(datasetStatus)) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid dataset status.')), res), 400);
   }
   else if (orgSelection === 'other' && !otherOrgFull) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter the full name of the organization.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter the full name of the organization.')), res), 400);
   }
   else if (orgSelection === 'other' && !orgAcronym) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter an acronym for the organization.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter an acronym for the organization.')), res), 400);
   }
   else if (datasetDate && datasetDate.toLowerCase() !== 'unknown' && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(datasetDate)) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.')), res), 400);
   }
   else if (file.size === 0 || file.size > maxUploadBytes) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The file must be between 1 byte and 10 MB.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The file must be between 1 byte and 10 MB.')), res), 400);
   }
 
   const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
   const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
   const allowed = allowedExtensions.get(extension);
   if (!allowed || !allowed.mimeTypes.includes(file.type.toLowerCase())) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.')), res), 400);
   }
 
   // verify inputs
   const content = Buffer.from(await file.arrayBuffer());
   if (extension === '.jpg' || extension === '.jpeg') {
     if (content[0] !== 0xff || content[1] !== 0xd8 || content[content.length - 2] !== 0xff || content[content.length - 1] !== 0xd9) {
-      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The JPG file contents do not match its extension.'))), 400);
+      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The JPG file contents do not match its extension.')), res), 400);
     }
   } 
   else if (extension === '.png') {
     if (content.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
-      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The PNG file contents do not match its extension.'))), 400);
+      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The PNG file contents do not match its extension.')), res), 400);
     }
   } 
   else if (content.includes(0)) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The CSV file contains binary data and could not be accepted.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The CSV file contains binary data and could not be accepted.')), res), 400);
   }
 
   // add to organization database 
@@ -497,7 +600,7 @@ app.post('/submit', async (c) => {
     orgAcronym || null,
   );
   if (!resolvedOrg) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid organization.'))), 400);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid organization.')), res), 400);
   }
 
   await mkdir(uploadDirectory, { recursive: true });
@@ -511,14 +614,17 @@ app.post('/submit', async (c) => {
       file_name: fileName,
       reviewed: false,
       dataset_date: datasetDate || null,
+      dataset_description: datasetDescription || null,
+      dataset_kind: datasetKind,
+      dataset_status: datasetStatus,
       org_id: resolvedOrg,
     }, tags);
   }
 
   catch (error) {
     await unlink(storedPath).catch(() => undefined);
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.'))), 500);
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.')), res), 500);
   }
 
-  return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess())));
+  return c.html(layout(SubmitPage(await getOrganizations(), submitSuccess()), res));
 });

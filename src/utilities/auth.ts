@@ -1,11 +1,24 @@
-import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { Context } from 'hono';
+import { db } from '../db/db.js';
 
 const scrypt = promisify(scryptCallback);
-const sessions = new Map<string, { userId: number; username: string; expiresAt: number }>();
-const sessionMaxAge = 8 * 60 * 60 * 1000;
+const sessionCookieName = 'archive_session';
 
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function readToken(c: Context) {
+  const cookie = c.req.header('Cookie') ?? '';
+  return cookie.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${sessionCookieName}=`))
+    ?.slice(sessionCookieName.length + 1);
+}
+
+// this is specifically for passwords
 export async function hashPassword(password: string) {
   const salt = randomBytes(16);
   const derivedKey = await scrypt(password, salt, 64) as Buffer;
@@ -22,34 +35,62 @@ export async function verifyPassword(password: string, storedHash: string) {
   return derivedKey.length === expectedKey.length && timingSafeEqual(derivedKey, expectedKey);
 }
 
-export function createSession(userId: number, username: string) {
-  const token = randomUUID();
-  sessions.set(token, { userId, username, expiresAt: Date.now() + sessionMaxAge });
-  return token;
-}
-
-export function getSession(c: Context) {
-  const cookie = c.req.header('Cookie') ?? '';
-  const token = cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('archive_session='))?.slice('archive_session='.length);
+export async function getSession(c: Context) {
+  const token = readToken(c);
   if (!token) {
     return null;
   }
-  const session = sessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    sessions.delete(token);
+
+  const tokenHash = hashToken(token);
+  const session = await db
+    .selectFrom('user_cookies')
+    .innerJoin('users', 'users.user_id', 'user_cookies.user_id')
+    .select([
+      'user_cookies.user_id',
+      'user_cookies.expires_at',
+      'users.username',
+      'users.is_locked',
+    ])
+    .where('user_cookies.token_hash', '=', tokenHash)
+    .where('user_cookies.expires_at', '>', new Date())
+    .executeTakeFirst();
+
+  if (!session || session.is_locked) {
+    await db.deleteFrom('user_cookies').where('token_hash', '=', tokenHash).execute();
     return null;
   }
-  return { token, ...session };
+
+  return {
+    token,
+    userId: session.user_id,
+    username: session.username,
+    expiresAt: session.expires_at.getTime(),
+  };
 }
 
-export function setSessionCookie(c: Context, token: string) {
-  c.header('Set-Cookie', `archive_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${sessionMaxAge / 1000}`);
+export async function setSessionCookie(c: Context, userId: number) {
+
+  const token = randomBytes(64).toString('base64url');
+  const expiresAt = new Date(Date.now() + (14 * 24 * 60 * 60 * 1000));
+
+  await db.insertInto('user_cookies').values({
+    user_id: userId,
+    token_hash: hashToken(token),
+    expires_at: expiresAt,
+  }).execute();
+
+  c.header(
+    'Set-Cookie',
+    `${sessionCookieName}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${(14 * 24 * 60 * 60 * 1000) / 1000}`,
+  );
 }
 
-export function clearSession(c: Context) {
-  const session = getSession(c);
-  if (session) {
-    sessions.delete(session.token);
+export async function clearSession(c: Context) {
+
+  const token = readToken(c);
+  if (token) {
+    await db.deleteFrom('user_cookies').where('token_hash', '=', hashToken(token)).execute();
   }
-  c.header('Set-Cookie', 'archive_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+
+  c.header('Set-Cookie', `${sessionCookieName}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
 }

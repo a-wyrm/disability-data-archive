@@ -167,7 +167,6 @@ export async function DatasetPage(
 								</div>
 							</fieldset>
 							<button class="time-period-submit" type="submit">Submit</button>
-							<button class="time-period-hide" type="button" aria-label="Hide time period filter">⌃ <span>Hide</span></button>
 						</div>
 					</details>
 				</form>
@@ -210,17 +209,12 @@ export async function DatasetPage(
 
 
 						document.querySelectorAll('.time-period-filter').forEach((timePeriod) => {
-							const hideButton = timePeriod.querySelector('.time-period-hide');
 							const summary = timePeriod.querySelector('summary');
 							if (!(timePeriod instanceof HTMLDetailsElement)
 								|| !(hideButton instanceof HTMLButtonElement)
 								|| !(summary instanceof HTMLElement)) {
 								return;
 							}
-							hideButton.addEventListener('click', () => {
-								timePeriod.open = false;
-								summary.focus();
-							});
 						});
 					})();
 				</script>
