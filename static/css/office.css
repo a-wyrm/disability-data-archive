@@ -1,0 +1,52 @@
+.office-page {
+	border-top: 1px solid;
+	margin-top: 2rem;
+	padding-top: 3rem;
+}
+
+.office-page-intro {
+	max-width: 720px;
+}
+
+.office-page-intro h1 {
+	font-size: clamp(2.5rem, 7vw, 6.5rem);
+	letter-spacing: -0.04em;
+	line-height: .95;
+}
+
+.office-grid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	margin-top: 4rem;
+}
+
+.office-card {
+	border: 1px solid;
+	display: flex;
+	flex-direction: column;
+	gap: .75rem;
+	min-height: 150px;
+	padding: 1.5rem;
+	text-decoration: none;
+	transition: background-color .15s ease, transform .15s ease;
+}
+
+.office-card:hover,
+.office-card:focus-visible {
+	background: var(--pico-muted-border-color);
+	transform: translateY(-2px);
+}
+
+.office-card strong {
+	font-size: 1.5rem;
+}
+
+.office-count {
+	color: var(--pico-muted-color);
+	font-size: 1rem;
+}
+
+.office-card span {
+	color: var(--pico-muted-color);
+}

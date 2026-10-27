@@ -40,37 +40,27 @@ export function HomePage({ rescuedDatasets, volunteers }: HomeStats) {
       </div>
       <div class="home-browse-grid">
         <a class="home-browse-card home-browse-card-featured" href="/datasets">
-          <span class="home-card-number">01</span>
           <div>
             <h3>Browse datasets</h3>
             <p>Search the rescued disability data currently available in the archive.</p>
           </div>
           <span class="home-card-arrow" aria-hidden="true">↗</span>
         </a>
-        <article class="home-browse-card" aria-labelledby="categories-title">
-          <span class="home-card-number">02</span>
-          <div>
-            <h3 id="categories-title">Browse categories</h3>
-            <p>Organized views by topic are coming soon.</p>
-          </div>
-          <span class="home-card-status">Coming soon</span>
-        </article>
-        <article class="home-browse-card" aria-labelledby="offices-title">
-          <span class="home-card-number">03</span>
+        <a class="home-browse-card home-browse-card-featured" href="/offices">
           <div>
             <h3 id="offices-title">Browse offices</h3>
-            <p>Explore data by agency or office when this view is ready.</p>
+            <p>Explore data by agency or office.</p>
           </div>
-          <span class="home-card-status">Coming soon</span>
-        </article>
+          <span class="home-card-arrow" aria-hidden="true">↗</span>
+        </a>
       </div>
     </section>
 
     <section class="home-callout" aria-labelledby="home-callout-title">
       <div>
-        <h2 id="home-callout-title">Know about disability data that should be preserved?</h2>
+        <h2 id="home-callout-title">Want to get involved?</h2>
       </div>
-      <a href="/submit">Submit a dataset</a>
+      <a href="/signup">Sign up to volunteer</a>
     </section>
   `;
 }

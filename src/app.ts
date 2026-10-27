@@ -7,7 +7,7 @@ import { basename, join, resolve } from 'node:path';
 
 // components
 import { Header } from './components/header.js';
-import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
+import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 import { clearSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
@@ -23,6 +23,7 @@ import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
 import { ReviewFilePage } from './pages/userPages/review_files.js';
 import { HomePage } from './pages/home.js';
+import { OfficePage } from './pages/office.js';
 
 
 // upload stuff
@@ -165,6 +166,16 @@ app.get("/search", async (c) => {
   return c.html(layout(SearchPage(results, searchValue), res));
 });
 
+app.get('/offices', async (c) => {
+  const session = await getSession(c);
+  const [organizations, artifacts] = await Promise.all([getOrganizations(), getAllArtifacts()]);
+  const officeCounts = new Map<string, number>();
+  for (const artifact of artifacts) {
+    officeCounts.set(artifact.org_id, (officeCounts.get(artifact.org_id) ?? 0) + 1);
+  }
+  return c.html(layout(OfficePage(organizations, officeCounts), checkAuth(session?.token)));
+});
+
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
@@ -183,7 +194,9 @@ app.get('/datasets', async (c) => {
 
   // The filter value is the same acronym stored in disability_artifacts.org_id.
   const normalizeOrganization = (value: string) => value.trim().toLocaleLowerCase();
-  const selectedOrganizationId = c.req.query('org_name')?.trim() || undefined;
+  const selectedOrganizationId = c.req.query('org_id')?.trim()
+    || c.req.query('org_name')?.trim()
+    || undefined;
 
 
   //search tags
@@ -373,10 +386,11 @@ app.get('/userPages/review_files/:id', async (c) => {
     return c.notFound();
   }
 
-  const [user, organizations, tags] = await Promise.all([
+  const [user, organizations, tags, knownTags] = await Promise.all([
     getUserById(session.userId),
     getOrganizations(),
     getPendingArtifactTags(id),
+    getAllTags(),
   ]);
   return c.html(layout(ReviewFilePage(
     artifact,
@@ -385,6 +399,7 @@ app.get('/userPages/review_files/:id', async (c) => {
     user?.reputation ?? 0,
     organizations,
     tags.map((tag) => tag.name),
+    knownTags,
   ), true));
 });
 

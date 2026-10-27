@@ -1,6 +1,8 @@
 import { escapeHtml, renderCommentText } from '../../utilities/escape_html.js';
 import type { DisabilityArtifact, Organization } from '../../db/db.js';
+import { getDevRevision } from "../../app.js";
 import type { ReviewComment } from '../../db/db.js';
+import { TagWrangler } from '../../components/tag_wrangler.js';
 
 
 
@@ -29,6 +31,7 @@ export function ReviewFilePage(
 	currentUserReputation: number,
 	organizations: Organization[],
 	tags: string[],
+	knownTags: string[],
 	message = '',
 ) {
 	const canEdit = currentUserReputation > 49;
@@ -44,9 +47,7 @@ export function ReviewFilePage(
                 <textarea id="dataset_description" name="dataset_description" maxlength="12000">${escapeHtml(artifact.dataset_description ?? '')}</textarea>
             </label>
             <p>Original tags: ${escapeHtml(tags.length ? tags.join(', ') : 'None')}</p>
-            <label for="tags">Tags <small>(comma-separated)</small>
-                <input id="tags" name="tags" value="${escapeHtml(tags.join(', '))}" maxlength="2000">
-            </label>
+            ${TagWrangler(tags, knownTags)}
             <p>Original created at: ${escapeHtml(originalCreatedAt)}</p>
             <label for="created_at">Created at
                 <input id="created_at" name="created_at" type="datetime-local" value="${escapeHtml(originalCreatedAt.slice(0, 16))}" required>
@@ -71,6 +72,7 @@ export function ReviewFilePage(
             <small>These changes are saved only when you approve this dataset.</small> 
         `
 	return `
+        <link rel="stylesheet" href="/static/css/user_pages.css?v=${getDevRevision()}">
         <section class="dataset-detail">
             <link rel="stylesheet" href="/static/css/user_pages.css">
             <a class="back-link" href="/userPages/review_list">Back to reviews</a>

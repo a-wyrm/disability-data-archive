@@ -8,6 +8,15 @@ export async function getOrganizations(): Promise<Organization[]> {
     .execute();
 }
 
+export async function getAllTags(): Promise<string[]> {
+  const tags = await db
+    .selectFrom('tags')
+    .select('name')
+    .orderBy('name', 'asc')
+    .execute();
+  return tags.map((tag) => tag.name);
+}
+
 export async function resolveOrganization(acronym: string, orgFull: string | null, orgAcr: string | null): Promise<string | null> {
   return await db.transaction().execute(async (trx) => {
     if (acronym !== 'other') {

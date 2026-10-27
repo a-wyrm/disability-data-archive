@@ -87,3 +87,23 @@
 .comment-mention {
 	color: var(--pico-primary);
 }
+
+.tag-suggestions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin: -.5rem 0 1rem;
+	padding-top: 25px;
+}
+
+.tag-suggestions > span {
+	width: 100%;
+	font-size: .9rem;
+}
+
+.tag-suggestion {
+	margin: 0;
+	padding: .25rem .6rem;
+	font-size: .85rem;
+}
