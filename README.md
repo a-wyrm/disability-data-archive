@@ -62,8 +62,6 @@ It would be time-consuming to install and configure all of these on your compute
     docker compose build
     ```
 
-You should see a 
-
 ### Step 4: Start development
 
 There are two ways to run the project-- through Docker (step 1) or locally using Postgres on your machine (step 2): 
@@ -71,18 +69,16 @@ There are two ways to run the project-- through Docker (step 1) or locally using
 #### DOCKER
 1. Start up the required development infrastructure:
     ```
-    docker compose up
-    ``` 
-    or 
-    ```
     docker compose up -d
     ```
+    If you run this command, you should see the status of each container. You can then run ```docker ps``` to see the running containers.
+
 
     > Note: You can run `docker container ls` to see a list of your containers. Learn more about Docker commands [here](https://docs.docker.com/engine/reference/commandline/container_ls/).
 
 2. To open a PostgreSQL shell in the Docker database:
 
-```bash
+```
 docker exec -it backend psql -U archive -d disability_archive
 ```
 
@@ -102,10 +98,9 @@ While `npm run dev` is running, edits under `src/` restart Hono and automaticall
     ```
 
 3. To insert the dummy data while running locally:
-
-```bash
-npm run data
-```
+    ```
+    npm run data
+    ```
 
 
 Importantly, it is optional to run either the frontend and/or backend locally -- for dev work, I often run the frontend locally, and have docker run the backend.
