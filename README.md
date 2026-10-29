@@ -27,7 +27,6 @@ Environment variables:
 | Variable | Description |
 | --- | --- |
 | `PORT` | Port used by the application server. Defaults to `3000`. |
-| `HOST` | Included for local configuration, but the current server does not read this variable. |
 | `UPLOAD_DIRECTORY` | Directory where uploaded dataset and image files are stored. Defaults to `uploads`; the directory is created automatically if it does not exist. |
 | `DB_USERNAME` | PostgreSQL username used by Docker Compose and the application database connection. |
 | `DB_PASSWORD` | Password for `DB_USERNAME`, used by Docker Compose and the application database connection. |
@@ -77,10 +76,9 @@ There are two ways to run the project-- through Docker (step 1) or locally using
     > Note: You can run `docker container ls` to see a list of your containers. Learn more about Docker commands [here](https://docs.docker.com/engine/reference/commandline/container_ls/).
 
 2. To open a PostgreSQL shell in the Docker database:
-
-```
-docker exec -it backend psql -U archive -d disability_archive
-```
+    ```
+    docker exec -it backend psql -U archive -d disability_archive
+    ```
 
 #### LOCAL
 
