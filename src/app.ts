@@ -28,6 +28,7 @@ import { OfficePage } from './pages/office.js';
 
 // upload stuff
 const uploadDirectory = resolve(process.env.UPLOAD_DIRECTORY ?? 'uploads');
+await mkdir(uploadDirectory, { recursive: true });
 const maxUploadBytes = 10 * 1024 * 1024;
 const allowedExtensions = new Map([
   ['.csv', { type: 'csv', mimeTypes: ['text/csv', 'application/csv', 'application/vnd.ms-excel'] }],
