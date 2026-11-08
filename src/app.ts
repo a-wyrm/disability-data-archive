@@ -5,6 +5,10 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
 
+// Azure 
+import { BlobServiceClient } from '@azure/storage-blob';
+import { DefaultAzureCredential } from '@azure/identity';
+
 // components
 import { Header } from './components/header.js';
 import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
@@ -27,8 +31,90 @@ import { OfficePage } from './pages/office.js';
 
 
 // upload stuff
+const USE_LOCAL_STORAGE = process.env.USE_LOCAL_STORAGE === 'true';
 const uploadDirectory = resolve(process.env.UPLOAD_DIRECTORY ?? 'uploads');
-await mkdir(uploadDirectory, { recursive: true });
+const CONTAINER_NAME = process.env.BLOB_CONTAINER_NAME ?? 'uploads';
+
+let blobServiceClient: BlobServiceClient | null = null;
+
+if (!USE_LOCAL_STORAGE) {
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  if (!accountName) {
+    throw new Error('AZURE_STORAGE_ACCOUNT_NAME is required when USE_LOCAL_STORAGE is false');
+  }
+  
+  const accountUrl = `https://${accountName}.blob.core.windows.net`;
+  blobServiceClient = new BlobServiceClient(accountUrl, new DefaultAzureCredential());
+}
+
+
+export async function uploadFile(content: Buffer | string, extension: string){
+
+  const storedName = `${randomUUID()}${extension}`;
+
+  // if local storage is being used
+  if (USE_LOCAL_STORAGE) {
+
+    await mkdir(uploadDirectory, { recursive: true });
+    const storedPath = join(uploadDirectory, storedName);
+    await writeFile(storedPath, content, { flag: 'wx' });
+
+    return {
+      storedName, filePath: `/uploads/${storedName}` 
+    };
+  } 
+
+  // Azure
+  else {
+
+    if (!blobServiceClient) {
+      throw new Error('Blob service client is not initialized');
+    }
+
+    const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
+
+    // Ensure container exists
+    try {
+      await containerClient.createIfNotExists();
+    } 
+    catch (error) {
+      console.error('Failed to create container:', error);
+      throw error;
+    }
+
+    // Upload blob
+    const blockBlobClient = containerClient.getBlockBlobClient(storedName);
+    const bufferContent = typeof content === 'string' ? Buffer.from(content) : content;
+
+    await blockBlobClient.upload(bufferContent, bufferContent.length);
+
+    // Return the blob URL
+    const blobUrl = blockBlobClient.url;
+    return {
+      storedName,
+      filePath: blobUrl, // Full blob URL for Azure Storage
+    };
+  }
+}
+
+// delete files
+export async function deleteFile(storedName: string) {
+  if (USE_LOCAL_STORAGE) {
+
+    const filePath = join(uploadDirectory, storedName);
+    await unlink(filePath);
+  } 
+  else {
+    if (!blobServiceClient) {
+      throw new Error('Blob service client is not initialized');
+    }
+
+    const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
+    const blockBlobClient = containerClient.getBlockBlobClient(storedName);
+    await blockBlobClient.delete();
+  }
+}
+
 const maxUploadBytes = 10 * 1024 * 1024;
 const allowedExtensions = new Map([
   ['.csv', { type: 'csv', mimeTypes: ['text/csv', 'application/csv', 'application/vnd.ms-excel'] }],
@@ -36,8 +122,8 @@ const allowedExtensions = new Map([
   ['.jpeg', { type: 'image', mimeTypes: ['image/jpeg'] }],
   ['.png', { type: 'image', mimeTypes: ['image/png'] }],
 ]);
-const submissionAttempts = new Map<string, number[]>();
 
+const submissionAttempts = new Map<string, number[]>();
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
 
 
@@ -595,17 +681,7 @@ app.post('/submit', async (c) => {
 
   // verify inputs
   const content = Buffer.from(await file.arrayBuffer());
-  if (extension === '.jpg' || extension === '.jpeg') {
-    if (content[0] !== 0xff || content[1] !== 0xd8 || content[content.length - 2] !== 0xff || content[content.length - 1] !== 0xd9) {
-      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The JPG file contents do not match its extension.')), res), 400);
-    }
-  } 
-  else if (extension === '.png') {
-    if (content.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
-      return c.html(layout(SubmitPage(await getOrganizations(), submitError('The PNG file contents do not match its extension.')), res), 400);
-    }
-  } 
-  else if (content.includes(0)) {
+  if (content.includes(0)) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('The CSV file contains binary data and could not be accepted.')), res), 400);
   }
 
@@ -615,18 +691,20 @@ app.post('/submit', async (c) => {
     orgSelection === 'other' ? otherOrgFull : null,
     orgAcronym || null,
   );
+  
   if (!resolvedOrg) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid organization.')), res), 400);
   }
 
-  await mkdir(uploadDirectory, { recursive: true });
-  const storedName = `${randomUUID()}${extension}`;
-  const storedPath = join(uploadDirectory, storedName);
+  let storedName: string | undefined;
   try {
-    await writeFile(storedPath, content, { flag: 'wx' });
+
+    const uploadedFile = await uploadFile(content, extension);
+    storedName = uploadedFile.storedName;
+
     await createArtifactWithTags({
       artifact_type: allowed.type,
-      file_path: `/uploads/${storedName}`,
+      file_path: uploadedFile.filePath,
       file_name: fileName,
       reviewed: false,
       dataset_date: datasetDate || null,
@@ -638,7 +716,9 @@ app.post('/submit', async (c) => {
   }
 
   catch (error) {
-    await unlink(storedPath).catch(() => undefined);
+    if (storedName) {
+      await deleteFile(storedName).catch(() => undefined);
+    }
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.')), res), 500);
   }
 

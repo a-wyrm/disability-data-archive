@@ -20,7 +20,12 @@ npm run dev
 ### Step 1: Set local environment variables
 
 Create a `.env` file by copying `.env.example`.
-Update the variables in `.env` according to your preferences and development environment.
+Update the variables in `.env` according to your preferences and development environment. You can run the following command to create one:
+
+```
+copy .env.example .env
+```
+
 
 Environment variables:
 
@@ -32,9 +37,6 @@ Environment variables:
 | `DB_PASSWORD` | Password for `DB_USERNAME`, used by Docker Compose and the application database connection. |
 | `DATABASE_URL` | PostgreSQL connection string used by the application and migration scripts. Use `db` as the hostname inside Docker Compose and `localhost` when running commands directly on the host. |
 
-```
-copy .env.example .env
-```
 
 ### Step 2: Install dependencies using NPM
 
@@ -70,7 +72,7 @@ There are two ways to run the project-- through Docker (step 1) or locally using
     ```
     docker compose up -d
     ```
-    If you run this command, you should see the status of each container. You can then run ```docker ps``` to see the running containers.
+    If you run this command, you should see the status of each container.
 
 
     > Note: You can run `docker container ls` to see a list of your containers. Learn more about Docker commands [here](https://docs.docker.com/engine/reference/commandline/container_ls/).

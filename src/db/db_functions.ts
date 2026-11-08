@@ -91,7 +91,6 @@ export async function getPendingArtifacts() {
     .execute();
 }
 
-
 // Create artifact w/ tags
 export async function createArtifactWithTags(artifact: NewDisabilityArtifact, tagNames: string[]) {
   return await db.transaction().execute(async (trx) => {
@@ -389,4 +388,10 @@ export async function createUser(username: string, email: string, passwordHash: 
     .values({ username, email, password_hash: passwordHash })
     .returning(['user_id', 'username', 'email', 'is_locked'])
     .executeTakeFirstOrThrow();
+}
+
+
+export interface UploadResult {
+  storedName: string;
+  filePath: string; // This is what goes into the database
 }
