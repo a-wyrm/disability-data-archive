@@ -57,21 +57,38 @@ VALUES
   ('NSF',   'National Science Foundation'),
   ('OSHA',  'Occupational Safety and Health Administration');
 
+-- A grouping is the public dataset record. Every artifact belongs to one,
+-- including a grouping containing only a single artifact.
+CREATE TABLE artifact_grouping (
+  dataset_id SERIAL PRIMARY KEY,
+  org_id VARCHAR(50) NOT NULL REFERENCES org_acronym(acronym),
+  reviewed BOOLEAN NOT NULL DEFAULT FALSE,
+  dataset_date VARCHAR(100),
+  added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  dataset_description VARCHAR(12000),
+  dataset_kind VARCHAR(300),
+  dataset_status VARCHAR(20),
+  folder_path VARCHAR(512)
+);
+
 -- Main artifacts table
 CREATE TABLE disability_artifacts (
   id SERIAL PRIMARY KEY,
-  artifact_type VARCHAR(50) NOT NULL, -- 'csv', 'xlsx', 'image', 'video', 'audio'
+  artifact_type VARCHAR(50) NOT NULL, -- 'csv', 'xlsx', 'image', 'video', 'audio',
+  dataset_id INTEGER NOT NULL REFERENCES artifact_grouping(dataset_id),
   file_path VARCHAR(512) NOT NULL, -- local path or S3 URL
   file_name VARCHAR(255) NOT NULL,
-  org_id VARCHAR(50) NOT NULL REFERENCES org_acronym(acronym),
   reviewed BOOLEAN NOT NULL DEFAULT FALSE,
-  dataset_date VARCHAR(100), -- nullable; can be "unknown", "2024-01", "2023", etc.
-  added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  org_id VARCHAR(50) NOT NULL REFERENCES org_acronym(acronym),
+  dataset_date VARCHAR(100),
+  added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   dataset_description VARCHAR(12000),
-  dataset_kind VARCHAR(300), -- private or public dataset
-  dataset_status VARCHAR(20) -- discontinued, removed, available, study, unknown
+  dataset_kind VARCHAR(300),
+  dataset_status VARCHAR(20)
 );
 
 -- artifacts review table

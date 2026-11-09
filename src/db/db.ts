@@ -17,6 +17,7 @@ export interface OrgTable {
 export interface DisabilityArtifactsTable {
   id: Generated<number>;
   artifact_type: string; // 'csv', 'xlsx', 'image', 'video', 'audio'
+  dataset_id: Generated<number>;
   file_path: string;
   file_name: string;
   org_id: string;
@@ -28,6 +29,20 @@ export interface DisabilityArtifactsTable {
   dataset_description: string | null;
   dataset_kind: string;
   dataset_status: string;
+}
+
+export interface ArtifactGroupingTable {
+  dataset_id: Generated<number>;
+  org_id: string;
+  reviewed: boolean;
+  dataset_date: string | null;
+  added_at: Generated<Date>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  dataset_description: string | null;
+  dataset_kind: string | null;
+  dataset_status: string | null;
+  folder_path: string | null;
 }
 
 export interface ArtifactTagsTable {
@@ -76,6 +91,7 @@ export interface Database {
   tags: TagsTable;
   org_acronym: OrgTable;
   disability_artifacts: DisabilityArtifactsTable;
+  artifact_grouping: ArtifactGroupingTable;
   artifact_tags: ArtifactTagsTable;
   users: UsersTable;
   user_cookies: UserCookiesTable;
