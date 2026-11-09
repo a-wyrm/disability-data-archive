@@ -1,0 +1,9 @@
+
+# folders
+brfss-data/
+.idea/
+node_modules
+
+
+# files
+package-lock.json
