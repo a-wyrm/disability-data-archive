@@ -5,7 +5,6 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
 import unzipper from 'unzipper';
-import { ZipArchive } from "archiver";
 
 
 // Azure 
@@ -14,7 +13,11 @@ import { DefaultAzureCredential } from '@azure/identity';
 
 // components
 import { Header } from './components/header.js';
-import { createArtifactGroup, createReviewComment, createUser, findArtifactGroup, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
+import { createArtifactGroup, createReviewComment, createUser, findArtifactGroup, 
+        findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, 
+        getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, 
+        getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, 
+        updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 import { clearSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
@@ -31,6 +34,7 @@ import { ReviewListPage } from './pages/userPages/review_list.js';
 import { ReviewFilePage } from './pages/userPages/review_files.js';
 import { HomePage } from './pages/home.js';
 import { OfficePage } from './pages/office.js';
+import { Archiver } from 'archiver';
 
 
 // upload stuff
@@ -132,20 +136,31 @@ async function getUploadedArtifacts(files: File[]) {
   for (const file of files) {
     const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
     const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
+    console.log("EXTENSION: ", extension);
+
+
     if (extension === '.zip') {
       const directory = await unzipper.Open.buffer(Buffer.from(await file.arrayBuffer()));
       for (const entry of directory.files) {
-        if (entry.type !== 'File') continue;
+        if (entry.type !== 'File') { 
+          continue;
+        }
         const entryName = entry.path.replaceAll('\\', '/');
-        if (entryName.split('/').some((part) => part === '..' || part === '')) continue;
+        const pathParts = entryName.split('/');
+        if (pathParts.some((part) => part === '..') || entryName.startsWith('/')) {
+          continue;
+        }
+        if (pathParts.some((part) => part.startsWith('.') || part === '__MACOSX')) {
+          continue;
+        }
         const entryExtension = entryName.slice(entryName.lastIndexOf('.')).toLowerCase();
         const allowed = allowedExtensions.get(entryExtension);
         if (!allowed) throw new Error('ZIP contains an unsupported file type.');
         const content = await entry.buffer();
-        if (content.length === 0 || content.length > maxUploadBytes || content.includes(0)) {
+        if (content.length === 0 || content.length > maxUploadBytes) {
           throw new Error('ZIP contains an invalid or oversized file.');
         }
-        uploads.push({ name: entryName, extension: entryExtension, type: allowed.type, content });
+        uploads.push({ name: basename(entryName), extension: entryExtension, type: allowed.type, content });
       }
       continue;
     }
@@ -154,7 +169,7 @@ async function getUploadedArtifacts(files: File[]) {
       throw new Error('Only CSV, JPG, PNG, and ZIP files with a matching file type are accepted.');
     }
     const content = Buffer.from(await file.arrayBuffer());
-    if (content.length === 0 || content.length > maxUploadBytes || content.includes(0)) {
+    if (content.length === 0 || content.length > maxUploadBytes || (allowed.type === 'csv' && content.includes(0))) {
       throw new Error('The uploaded file is invalid or oversized.');
     }
     uploads.push({ name: originalName, extension, type: allowed.type, content });
@@ -306,17 +321,16 @@ app.get('/offices', async (c) => {
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
-  const artifactCounts = new Map<number, number>();
-  for (const artifact of artifacts) artifactCounts.set(artifact.dataset_id, (artifactCounts.get(artifact.dataset_id) ?? 0) + 1);
   const groupedArtifacts = [...new Map(artifacts.map((artifact) => [artifact.dataset_id, artifact])).values()]
     .map((artifact) => ({
       ...artifact,
       id: artifact.dataset_id,
-      file_name: (artifactCounts.get(artifact.dataset_id) ?? 1) > 1
-        ? `Dataset grouping (${artifactCounts.get(artifact.dataset_id)} artifacts)`
-        : artifact.file_name,
+      dataset_date: artifact.grouping_dataset_date,
+      file_name: artifact.grouping_file_name,
       representative_id: artifact.id,
     }));
+
+  const count_group = groupedArtifacts.length;
   const taggedArtifacts = await Promise.all(groupedArtifacts.map((artifact) => findArtifactWithTags(Number(artifact.representative_id))));
 
   // map artifacts to their tags
@@ -383,11 +397,12 @@ app.get('/datasets', async (c) => {
   // specifically, the artifacts dataset and organization db
   // because id is generated by the db we pass unknown to parameter 1
   const session = await getSession(c);
-  const res = checkAuth(session?.token);
+  const res = checkAuth(session?.token);;
   return c.html(layout(await DatasetPage(
     filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
     filters,
     { allDatasets: groupedArtifacts as unknown as Parameters<typeof DatasetPage>[0], organizations},
+    count_group
   ), res));
 });
 
@@ -432,8 +447,10 @@ app.get('/datasets/:datasetId/artifacts/:id/view', async (c) => {
 
 app.get('/datasets/:id/download', async (c) => {
   const group = await findArtifactGroup(Number(c.req.param('id')));
-  if (!group || group.artifacts.length < 2) return c.notFound();
-  const archive = new ZipArchive;
+  if (!group || group.artifacts.length < 2) { 
+    return c.notFound();
+  }
+  const archive = new Archiver;
   const chunks: Buffer[] = [];
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<void>((resolve, reject) => {
@@ -445,7 +462,9 @@ app.get('/datasets/:id/download', async (c) => {
       archive.file(join(process.cwd(), artifact.file_path.slice('/uploads/'.length)), { name: artifact.file_name });
     } else {
       const response = await fetch(artifact.file_path);
-      if (!response.ok) throw new Error(`Unable to download ${artifact.file_name}`);
+      if (!response.ok) {
+        throw new Error(`Unable to download ${artifact.file_name}`);
+      }
       archive.append(Buffer.from(await response.arrayBuffer()), { name: artifact.file_name });
     }
   }
@@ -718,8 +737,7 @@ app.post('/submit', async (c) => {
   const datasetDescription = typeof body.dataset_description === 'string' ? body.dataset_description.trim() : '';
   const datasetKind = typeof body.dataset_kind === 'string' ? body.dataset_kind.trim() : '';
   const datasetStatus = typeof body.dataset_status === 'string' ? body.dataset_status.trim() : '';
-  const files = (Array.isArray(body.artifact_file) ? body.artifact_file : [body.artifact_file])
-    .filter((file): file is File => file instanceof File);
+  const files = (Array.isArray(body.artifact_file) ? body.artifact_file : [body.artifact_file]).filter((file): file is File => file instanceof File);
 
   const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
   const session = await getSession(c);
@@ -746,10 +764,12 @@ app.post('/submit', async (c) => {
   else if (datasetDate && datasetDate.toLowerCase() !== 'unknown' && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(datasetDate)) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.')), res), 400);
   }
+
   let uploadedArtifacts: Awaited<ReturnType<typeof getUploadedArtifacts>>;
   try {
     uploadedArtifacts = await getUploadedArtifacts(files);
-  } catch (error) {
+  } 
+  catch (error) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError(error instanceof Error ? error.message : 'The upload is invalid.')), res), 400);
   }
 
@@ -779,12 +799,13 @@ app.post('/submit', async (c) => {
       dataset_kind: datasetKind,
       dataset_status: datasetStatus,
       org_id: resolvedOrg,
-    }, storedArtifacts, tags);
+    }, storedArtifacts, tags, fileName);
 
   }
 
   catch (error) {
     for (const storedName of storedNames) await deleteFile(storedName).catch(() => undefined);
+    console.error('Failed to save submission:', error);
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.')), res), 500);
   }
 

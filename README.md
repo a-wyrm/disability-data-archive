@@ -91,7 +91,7 @@ While `npm run dev` is running, edits under `src/` restart Hono and automaticall
     npm run dev
     ```
 
-2. To start the backend, open PostgresSQL and run:
+2. To start the backend:
     ```
     npm run db:migrate
     npm run dev
@@ -118,6 +118,7 @@ Importantly, it is optional to run either the frontend and/or backend locally --
 
 I use pgAdmin also running on a docker container to interface with my SQL database. When you want pgAdmin to connect to a docker container, use this URL for the hostname:
 
+- docker run -p 80:80 -e "PGADMIN_DEFAULT_EMAIL=SECRET" -e "SECRET" -d dpage/pgadmin4
 - host.docker.internal
 
 

@@ -23,8 +23,9 @@ export type DatasetFilterOptions = {
 export async function DatasetPage(
 	datasets: DisabilityArtifactsTable[],
 	filters: DatasetFilters = {},
-	options: DatasetFilterOptions = { allDatasets: datasets, organizations: [] }) 
-{
+	options: DatasetFilterOptions = { allDatasets: datasets, organizations: [] },
+	count: number
+){
 
 	// make pages paginated
 	const perPage = 8;
@@ -113,7 +114,7 @@ export async function DatasetPage(
 				</div>
 				<div>
 					<p class="eyebrow">${escapeHtml(dataset.org_id)}</p>
-					<h2>${escapeHtml(dataset.file_name)}</h2>
+					<h2>${escapeHtml(dataset.file_name)} (${count} artifact${count === 1 ? '' : 's'})</h2>
 					<p class="tile-description">${escapeHtml(dataset.artifact_type)}</p>
 				</div>
 				<footer>

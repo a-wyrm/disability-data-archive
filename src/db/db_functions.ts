@@ -57,7 +57,15 @@ export async function resolveOrganization(acronym: string, orgFull: string | nul
 
 // Get list of artifacts
 export async function getAllArtifacts() {
-  return await db.selectFrom('disability_artifacts').selectAll().where('reviewed', '=', true).execute();
+  return await db
+    .selectFrom('disability_artifacts')
+    .innerJoin('artifact_grouping', 'artifact_grouping.dataset_id', 'disability_artifacts.dataset_id')
+    .selectAll('disability_artifacts')
+    .select('artifact_grouping.file_name as grouping_file_name')
+    .select('artifact_grouping.dataset_date as grouping_dataset_date')
+    .where('disability_artifacts.reviewed', '=', true)
+    .where('artifact_grouping.reviewed', '=', true)
+    .execute();
 }
 
 export async function getHomeStats() {
@@ -98,6 +106,7 @@ export async function createArtifactWithTags(artifact: NewDisabilityArtifact, ta
     // insert and return dataset_id 
     const group = await trx.insertInto('artifact_grouping')
     .values({
+      file_name: artifact.file_name,
       org_id: artifact.org_id,
       reviewed: artifact.reviewed,
       dataset_date: artifact.dataset_date,
@@ -152,10 +161,11 @@ export async function createArtifactGroup(
       metadata: Omit<NewDisabilityArtifact, 'dataset_id' | 'artifact_type' | 'file_path' | 'file_name'>,
       artifacts: Array<Pick<NewDisabilityArtifact, 'artifact_type' | 'file_path' | 'file_name'>>,
       tagNames: string[],
+      groupingFileName: string,
   ) {
     return await db.transaction().execute(async (trx) => {
       const group = await trx.insertInto('artifact_grouping')
-      .values(metadata)
+      .values({ ...metadata, file_name: groupingFileName })
       .returningAll()
       .executeTakeFirstOrThrow();
 

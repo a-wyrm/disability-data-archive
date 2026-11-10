@@ -33,6 +33,7 @@ export interface DisabilityArtifactsTable {
 
 export interface ArtifactGroupingTable {
   dataset_id: Generated<number>;
+  file_name: string;
   org_id: string;
   reviewed: boolean;
   dataset_date: string | null;

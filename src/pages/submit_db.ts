@@ -65,8 +65,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
         <input id="tags_input" type="text" maxlength="25" autocomplete="off" placeholder="Type a tag and press Enter">
 
         <label for="artifact-file">File
-          <input id="artifact-file" name="artifact_file" type="file" accept=".csv,.jpg,.jpeg,.png,text/csv,image/jpeg,image/png" multiple webkitdirectory>
-          <input id="artifact-zip" name="artifact_file" type="file" accept=".zip,application/zip" >
+          <input id="artifact-file" name="artifact_file" type="file" accept=".csv,.jpg,.jpeg,.png,text/csv,image/jpeg,image/png,.zip,application/zip">
           <small>Accepted formats: CSV, JPG, PNG, or a ZIP folder. Each file may be up to 10 MB.</small>
         </label>
 
