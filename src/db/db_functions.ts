@@ -57,7 +57,15 @@ export async function resolveOrganization(acronym: string, orgFull: string | nul
 
 // Get list of artifacts
 export async function getAllArtifacts() {
-  return await db.selectFrom('disability_artifacts').selectAll().where('reviewed', '=', true).execute();
+  return await db
+    .selectFrom('disability_artifacts')
+    .innerJoin('artifact_grouping', 'artifact_grouping.dataset_id', 'disability_artifacts.dataset_id')
+    .selectAll('disability_artifacts')
+    .select('artifact_grouping.file_name as grouping_file_name')
+    .select('artifact_grouping.dataset_date as grouping_dataset_date')
+    .where('disability_artifacts.reviewed', '=', true)
+    .where('artifact_grouping.reviewed', '=', true)
+    .execute();
 }
 
 export async function getHomeStats() {
@@ -91,14 +99,28 @@ export async function getPendingArtifacts() {
     .execute();
 }
 
-// Create artifact w/ tags
+// Create artifact grouping w/ tags
 export async function createArtifactWithTags(artifact: NewDisabilityArtifact, tagNames: string[]) {
   return await db.transaction().execute(async (trx) => {
+
+    // insert and return dataset_id 
+    const group = await trx.insertInto('artifact_grouping')
+    .values({
+      file_name: artifact.file_name,
+      org_id: artifact.org_id,
+      reviewed: artifact.reviewed,
+      dataset_date: artifact.dataset_date,
+      dataset_description: artifact.dataset_description,
+      dataset_kind: artifact.dataset_kind,
+      dataset_status: artifact.dataset_status,
+    })
+    .returning('dataset_id')
+    .executeTakeFirstOrThrow();
 
     // Insert artifact -- trx is transaction
     const insertedArtifact = await trx
       .insertInto('disability_artifacts')
-      .values({ ...artifact })
+      .values({ ...artifact, dataset_id: group.dataset_id })
       .returningAll()
       .executeTakeFirstOrThrow();
 
@@ -118,6 +140,7 @@ export async function createArtifactWithTags(artifact: NewDisabilityArtifact, ta
         .where('name', '=', tagName)
         .executeTakeFirstOrThrow()).id;
 
+
       // Link artifact to tag
       await trx
         .insertInto('artifact_tags')
@@ -128,6 +151,61 @@ export async function createArtifactWithTags(artifact: NewDisabilityArtifact, ta
 
     return insertedArtifact;
   });
+}
+  
+// artifact grouping
+// takes meta data w/o dataset id, file path, name, and type
+// takes a list of artifacts
+// and tags
+export async function createArtifactGroup(
+      metadata: Omit<NewDisabilityArtifact, 'dataset_id' | 'artifact_type' | 'file_path' | 'file_name'>,
+      artifacts: Array<Pick<NewDisabilityArtifact, 'artifact_type' | 'file_path' | 'file_name'>>,
+      tagNames: string[],
+      groupingFileName: string,
+  ) {
+    return await db.transaction().execute(async (trx) => {
+      const group = await trx.insertInto('artifact_grouping')
+      .values({ ...metadata, file_name: groupingFileName })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+      // insert artifacts into disability_artifacts table
+      for (const artifact of artifacts) {
+        const inserted = await trx.insertInto('disability_artifacts')
+          .values({
+            ...artifact,
+            dataset_id: group.dataset_id,
+            org_id: metadata.org_id,
+            reviewed: metadata.reviewed,
+            dataset_kind: metadata.dataset_kind,
+            dataset_status: metadata.dataset_status,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        // add tags to each artifact
+        // if a tag already exists do nothing
+        for (const tagName of tagNames) {
+          const tag = await trx.insertInto('tags').values({ name: tagName }).onConflict((oc) => oc.column('name').doNothing()).returningAll().executeTakeFirst();
+          const tagId = tag?.id ?? (await trx.selectFrom('tags').select('id').where('name', '=', tagName).executeTakeFirstOrThrow()).id;
+          await trx.insertInto('artifact_tags').values({ artifact_id: inserted.id, tag_id: tagId }).onConflict((oc) => oc.doNothing()).execute();
+        }
+      }
+    return group;
+  });
+}
+
+export async function findArtifactGroup(datasetId: number) {
+  const group = await db.selectFrom('artifact_grouping').selectAll()
+    .where('dataset_id', '=', datasetId).where('reviewed', '=', true).executeTakeFirst();
+  if (!group) {
+    return null;
+  }
+    const artifacts = await db.selectFrom('disability_artifacts').selectAll().where('dataset_id', '=', datasetId).orderBy('id', 'asc').execute();
+  const tags = artifacts.length === 0 ? [] : await db.selectFrom('artifact_tags')
+    .innerJoin('tags', 'tags.id', 'artifact_tags.tag_id')
+    .select(['tags.id', 'tags.name']).where('artifact_tags.artifact_id', '=', artifacts[0].id).execute();
+  return { ...group, artifacts, tags };
 }
 
 export async function findArtifactsByTags(tagNames: string[]) {
@@ -160,7 +238,9 @@ export async function findArtifactWithTags(artifactId: number) {
     .where('reviewed', '=', true)
     .executeTakeFirst();
 
-  if (!artifact) return null;
+  if (!artifact) {
+    return null;
+  }
 
   const tags = await db
     .selectFrom('artifact_tags')
@@ -188,7 +268,6 @@ export async function searchArtifacts(query: string) {
 
 	for (const word of words) {
 		const searchTerm = `%${word}%`;
-
 		request = request.where((eb) =>
 			eb.or([
 				eb('file_name', 'ilike', searchTerm),
@@ -250,7 +329,7 @@ export async function reviewArtifact(
   edits?: ArtifactReviewEdits,
 ) {
   return await db.transaction().execute(async (trx) => {
-    const artifact = await trx
+/*     const artifact = await trx
       .selectFrom('disability_artifacts')
       .select('id')
       .where('id', '=', artifactId)
@@ -260,7 +339,7 @@ export async function reviewArtifact(
           .select('review_id')
           .whereRef('artifacts_review.artifact_id', '=', 'disability_artifacts.id')
       )))
-      .executeTakeFirst();
+      .executeTakeFirst(); */
 
     if (status === 'approved' && edits) {
       await trx
@@ -307,6 +386,18 @@ export async function reviewArtifact(
       .set({ reviewed: status === 'approved', updated_at: new Date() })
       .where('id', '=', artifactId)
       .execute();
+    const artifactGroup = await trx.selectFrom('disability_artifacts')
+      .select('dataset_id').where('id', '=', artifactId).executeTakeFirstOrThrow();
+    const unapprovedArtifact = await trx
+      .selectFrom('disability_artifacts')
+      .select('id')
+      .where('dataset_id', '=', artifactGroup.dataset_id)
+      .where('reviewed', '=', false)
+      .executeTakeFirst();
+    await trx.updateTable('artifact_grouping')
+      .set({ reviewed: !unapprovedArtifact, updated_at: new Date() })
+      .where('dataset_id', '=', artifactGroup.dataset_id)
+      .execute();
 
     if (status === 'approved') {
       await trx
@@ -352,7 +443,10 @@ export async function createReviewComment(
       .where('comment_id', '=', parentCommentId)
       .where('artifact_id', '=', artifactId)
       .executeTakeFirst();
-    if (!parent) return null;
+
+    if (!parent){
+      return null;
+    }
   }
 
   return await db

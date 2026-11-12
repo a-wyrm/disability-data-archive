@@ -1,17 +1,11 @@
 import 'dotenv/config';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { sql } from 'kysely';
 import { db, closeDatabase } from './db/db.js';
 
-await sql`
-  CREATE TABLE IF NOT EXISTS records (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    source TEXT NOT NULL,
-    published_year INTEGER NOT NULL CHECK (published_year BETWEEN 1800 AND 2200),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )
-`.execute(db);
+const migration = await readFile(resolve('migrations/003_user_cookies.sql'), 'utf8');
+await sql.raw(migration).execute(db);
 
-console.log('Database is ready.');
+console.log('Database migrations are ready.');
 await closeDatabase();

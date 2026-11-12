@@ -65,8 +65,8 @@ export function SubmitPage(organizations: Organization[], message = "") {
         <input id="tags_input" type="text" maxlength="25" autocomplete="off" placeholder="Type a tag and press Enter">
 
         <label for="artifact-file">File
-          <input id="artifact-file" name="artifact_file" type="file" accept=".csv,.jpg,.jpeg,.png,text/csv,image/jpeg,image/png" required>
-          <small>Accepted formats: CSV, JPG, and PNG. Maximum size: 10 MB.</small>
+          <input id="artifact-file" name="artifact_file" type="file" accept=".csv,.jpg,.jpeg,.png,text/csv,image/jpeg,image/png,.zip,application/zip">
+          <small>Accepted formats: CSV, JPG, PNG, or a ZIP folder. Each file may be up to 10 MB.</small>
         </label>
 
         <label class="submit-honeypot" aria-hidden="true">Leave this field blank
@@ -118,6 +118,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
             for (const tag of active) {
                 const chip = document.createElement('span');
                 chip.className = 'badge react';
+                chip.style = 'padding-right: 5px;';
 
                 const label = document.createElement('span');
                 label.className = 'filter-chip_label';

@@ -13,6 +13,7 @@ const DEFAULT_OUTPUT = path.resolve("brfss-data");
 const DEFAULT_MAX_PAGES = 1000;
 const DEFAULT_MAX_DEPTH = 10;
 
+// accepted download extensions
 const downloadableExtensions = new Set([
   ".7z", ".csv", ".dat", ".dbf", ".dta", ".gz", ".mdb", ".pdf", ".sav",
   ".sas", ".sas7bdat", ".sps", ".txt", ".zip",
@@ -165,6 +166,7 @@ async function main() {
   const startUrl = new URL(options.startUrl).href;
   await fs.mkdir(options.output, { recursive: true });
 
+  // change if you want another path
   const catalogPath = path.join(options.output, "brfss-pages.csv");
   const catalog = [];
   const queue = [{ url: startUrl, depth: 0, parent: "" }];

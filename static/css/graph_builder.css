@@ -1,0 +1,82 @@
+.graph-builder {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--csv-gray-200, #dee1e2);
+  border-radius: .35rem;
+}
+
+.graph-builder-heading h2 {
+  margin-bottom: .25rem;
+}
+
+.graph-builder-heading p,
+.graph-status {
+  color: var(--csv-gray-700, #495057);
+}
+
+.graph-builder-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+}
+
+.graph-builder-controls label {
+  min-width: 10rem;
+  flex: 1;
+}
+
+.graph-builder-controls select,
+.graph-builder-controls button {
+  margin-bottom: 0;
+}
+
+.graph-status {
+  min-height: 1.25rem;
+  font-size: .85rem;
+}
+
+.graph-output {
+  overflow: hidden;
+}
+
+.graph-frame {
+  position: relative;
+}
+
+.graph-zoom-in {
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+  z-index: 1;
+  margin: 0;
+}
+
+.graph-scroll {
+  overflow-x: auto;
+}
+
+.bar-chart {
+  display: block;
+  min-width: 640px;
+  width: 100%;
+  height: 360px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.bar-chart:active {
+  cursor: grabbing;
+}
+
+.graph-bar {
+  fill: #4f7f5a;
+}
+
+.graph-bar:hover {
+  fill: #2f5738;
+}
+
+.graph-message {
+  color: #8a1c1c;
+}

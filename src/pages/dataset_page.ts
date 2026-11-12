@@ -23,11 +23,13 @@ export type DatasetFilterOptions = {
 export async function DatasetPage(
 	datasets: DisabilityArtifactsTable[],
 	filters: DatasetFilters = {},
-	options: DatasetFilterOptions = { allDatasets: datasets, organizations: [] }) 
-{
+	options: DatasetFilterOptions = { allDatasets: datasets, organizations: [] },
+	count: number
+){
 
 	// make pages paginated
 	const perPage = 8;
+
 	// if odd get the higher number
 	const pageCount = Math.ceil(datasets.length / perPage);
 	const curPage = Math.min(Math.max(1, filters.page ?? 1), Math.max(1, pageCount));
@@ -95,6 +97,13 @@ export async function DatasetPage(
 	] as const;
 
 	const agencyValue = filters.org_name ?? '';
+
+	const artifactCounts = new Map<number, number>();
+	for (const dataset of options.allDatasets) {
+		artifactCounts.set(Number(dataset.dataset_id), (artifactCounts.get(Number(dataset.dataset_id)) ?? 0) + 1);
+	}
+
+
 	const agencyOptions = agencies.map(({ acronym, name, count }) => `
 							<label><input type="checkbox" name="org_name" value="${escapeHtml(acronym)}"${acronym === agencyValue ? ' checked' : ''}> ${escapeHtml(name)} (${count.toLocaleString()})</label>
 						`).join('');
@@ -113,8 +122,7 @@ export async function DatasetPage(
 				</div>
 				<div>
 					<p class="eyebrow">${escapeHtml(dataset.org_id)}</p>
-					<h2>${escapeHtml(dataset.file_name)}</h2>
-					<p class="tile-description">${escapeHtml(dataset.artifact_type)}</p>
+						<h2>${escapeHtml(dataset.file_name)} (${count ?? 1} artifact${count === 1 ? '' : 's'})</h2>
 				</div>
 				<footer>
 					<span>${(artifactsWithTags[index]?.tags ?? []).map(tag => escapeHtml(tag.name)).join(' · ')}</span>
@@ -210,9 +218,7 @@ export async function DatasetPage(
 
 						document.querySelectorAll('.time-period-filter').forEach((timePeriod) => {
 							const summary = timePeriod.querySelector('summary');
-							if (!(timePeriod instanceof HTMLDetailsElement)
-								|| !(hideButton instanceof HTMLButtonElement)
-								|| !(summary instanceof HTMLElement)) {
+							if (!(timePeriod instanceof HTMLDetailsElement) || !(summary instanceof HTMLElement)) {
 								return;
 							}
 						});

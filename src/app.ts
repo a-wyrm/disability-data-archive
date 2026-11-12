@@ -4,6 +4,8 @@ import { statSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
+import unzipper from 'unzipper';
+
 
 // Azure 
 import { BlobServiceClient } from '@azure/storage-blob';
@@ -11,7 +13,11 @@ import { DefaultAzureCredential } from '@azure/identity';
 
 // components
 import { Header } from './components/header.js';
-import { createArtifactWithTags, createReviewComment, createUser, findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, updateReviewComment } from './db/db_functions.js';
+import { createArtifactGroup, createReviewComment, createUser, findArtifactGroup, 
+        findArtifactWithTags, findPendingArtifact, findUserByLogin, getAllArtifacts, 
+        getAllTags, getHomeStats, getOrganizations, getPendingArtifactTags, getPendingArtifacts, 
+        getReviewComments, getUserById, resolveOrganization, reviewArtifact, searchArtifacts, 
+        updateReviewComment } from './db/db_functions.js';
 import { escapeHtml } from "./utilities/escape_html.js";
 import { clearSession, getSession, hashPassword, setSessionCookie, verifyPassword } from './utilities/auth.js';
 
@@ -21,13 +27,15 @@ import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
 import { SubmitPage, submitError, submitSuccess } from './pages/submit_db.js';
-import { CsvViewer } from './components/csv_viewer.js';
+import { CsvViewer } from './components/data-interaction/csv_viewer.js';
 import { CreateAccountPage, accountError } from './pages/userPages/create_account.js';
 import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
 import { ReviewFilePage } from './pages/userPages/review_files.js';
 import { HomePage } from './pages/home.js';
 import { OfficePage } from './pages/office.js';
+import { Archiver } from 'archiver';
+import { group } from 'node:console';
 
 
 // upload stuff
@@ -122,6 +130,54 @@ const allowedExtensions = new Map([
   ['.jpeg', { type: 'image', mimeTypes: ['image/jpeg'] }],
   ['.png', { type: 'image', mimeTypes: ['image/png'] }],
 ]);
+
+// upload multiple files when a group of files is uploaded
+async function getUploadedArtifacts(files: File[]) {
+  const uploads: Array<{ name: string; extension: string; type: string; content: Buffer }> = [];
+  for (const file of files) {
+    const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
+    const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
+    console.log("EXTENSION: ", extension);
+
+
+    if (extension === '.zip') {
+      const directory = await unzipper.Open.buffer(Buffer.from(await file.arrayBuffer()));
+      for (const entry of directory.files) {
+        if (entry.type !== 'File') { 
+          continue;
+        }
+        const entryName = entry.path.replaceAll('\\', '/');
+        const pathParts = entryName.split('/');
+        if (pathParts.some((part) => part === '..') || entryName.startsWith('/')) {
+          continue;
+        }
+        if (pathParts.some((part) => part.startsWith('.') || part === '__MACOSX')) {
+          continue;
+        }
+        const entryExtension = entryName.slice(entryName.lastIndexOf('.')).toLowerCase();
+        const allowed = allowedExtensions.get(entryExtension);
+        if (!allowed) throw new Error('ZIP contains an unsupported file type.');
+        const content = await entry.buffer();
+        if (content.length === 0 || content.length > maxUploadBytes) {
+          throw new Error('ZIP contains an invalid or oversized file.');
+        }
+        uploads.push({ name: basename(entryName), extension: entryExtension, type: allowed.type, content });
+      }
+      continue;
+    }
+    const allowed = allowedExtensions.get(extension);
+    if (!allowed || !allowed.mimeTypes.includes(file.type.toLowerCase())) {
+      throw new Error('Only CSV, JPG, PNG, and ZIP files with a matching file type are accepted.');
+    }
+    const content = Buffer.from(await file.arrayBuffer());
+    if (content.length === 0 || content.length > maxUploadBytes || (allowed.type === 'csv' && content.includes(0))) {
+      throw new Error('The uploaded file is invalid or oversized.');
+    }
+    uploads.push({ name: originalName, extension, type: allowed.type, content });
+  }
+  if (uploads.length === 0) throw new Error('The upload did not contain any supported files.');
+  return uploads;
+}
 
 const submissionAttempts = new Map<string, number[]>();
 type ArtifactRecord = Awaited<ReturnType<typeof getAllArtifacts>>[number];
@@ -258,7 +314,7 @@ app.get('/offices', async (c) => {
   const [organizations, artifacts] = await Promise.all([getOrganizations(), getAllArtifacts()]);
   const officeCounts = new Map<string, number>();
   for (const artifact of artifacts) {
-    officeCounts.set(artifact.org_id, (officeCounts.get(artifact.org_id) ?? 0) + 1);
+    officeCounts.set(artifact.org_id, artifacts.length);
   }
   return c.html(layout(OfficePage(organizations, officeCounts), checkAuth(session?.token)));
 });
@@ -266,7 +322,18 @@ app.get('/offices', async (c) => {
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
-  const taggedArtifacts = await Promise.all(artifacts.map((artifact) => findArtifactWithTags(Number(artifact.id))));
+  const groupedArtifacts = [...new Map(artifacts.map((artifact) => [artifact.dataset_id, artifact])).values()]
+    .map((artifact) => ({
+      ...artifact,
+      id: artifact.dataset_id,
+      dataset_date: artifact.grouping_dataset_date,
+      file_name: artifact.grouping_file_name,
+      representative_id: artifact.id,
+    }));
+
+
+  const count_group = artifacts.length;
+  const taggedArtifacts = await Promise.all(groupedArtifacts.map((artifact) => findArtifactWithTags(Number(artifact.representative_id))));
 
   // map artifacts to their tags
   const tagsByArtifactId = new Map(
@@ -311,10 +378,10 @@ app.get('/datasets', async (c) => {
     year: 365 * 24 * 60 * 60 * 1000,
   };
 
-  const filteredRecords = artifacts.filter((record) => {
+  const filteredRecords = groupedArtifacts.filter((record) => {
 
     // get matching tag
-    const recordTags = tagsByArtifactId.get(record.id) ?? [];
+    const recordTags = tagsByArtifactId.get(record.representative_id) ?? [];
     const matchingTag = selectedTags.length === 0 || selectedTags.some((tag) => recordTags.includes(tag));
 
     // Match the selected agency directly against the artifact's org_id.
@@ -332,11 +399,12 @@ app.get('/datasets', async (c) => {
   // specifically, the artifacts dataset and organization db
   // because id is generated by the db we pass unknown to parameter 1
   const session = await getSession(c);
-  const res = checkAuth(session?.token);
+  const res = checkAuth(session?.token);;
   return c.html(layout(await DatasetPage(
     filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
     filters,
-    { allDatasets: artifacts as unknown as Parameters<typeof DatasetPage>[0], organizations},
+    { allDatasets: groupedArtifacts as unknown as Parameters<typeof DatasetPage>[0], organizations},
+    count_group
   ), res));
 });
 
@@ -347,7 +415,7 @@ app.get('/datasets/:id', async (c) => {
     return c.notFound();
   }
 
-  const dataset = await findArtifactWithTags(id);
+  const dataset = await findArtifactGroup(id);
   if (!dataset) {
     return c.notFound();
   }
@@ -358,7 +426,7 @@ app.get('/datasets/:id', async (c) => {
   return c.html(layout(DatasetDetailPage(dataset), res));
 });
 
-app.get('/datasets/:id/view', async (c) => {
+app.get('/datasets/:datasetId/artifacts/:id/view', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id) || id < 1) {
     return c.notFound();
@@ -377,6 +445,36 @@ app.get('/datasets/:id/view', async (c) => {
   const session = await getSession(c);
   const res = checkAuth(session?.token);
   return c.html(layout(CsvViewer(dataset, getDevRevision()), res));
+});
+
+app.get('/datasets/:id/download', async (c) => {
+  const group = await findArtifactGroup(Number(c.req.param('id')));
+  if (!group || group.artifacts.length < 2) { 
+    return c.notFound();
+  }
+  const archive = new Archiver;
+  const chunks: Buffer[] = [];
+  archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<void>((resolve, reject) => {
+    archive.on('end', resolve);
+    archive.on('error', reject);
+  });
+  for (const artifact of group.artifacts) {
+    if (artifact.file_path.startsWith('/uploads/')) {
+      archive.file(join(process.cwd(), artifact.file_path.slice('/uploads/'.length)), { name: artifact.file_name });
+    } else {
+      const response = await fetch(artifact.file_path);
+      if (!response.ok) {
+        throw new Error(`Unable to download ${artifact.file_name}`);
+      }
+      archive.append(Buffer.from(await response.arrayBuffer()), { name: artifact.file_name });
+    }
+  }
+  await archive.finalize();
+  await done;
+  return new Response(Buffer.concat(chunks), {
+    headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="dataset-${group.dataset_id}.zip"` },
+  });
 });
 
 app.get('/records', async (c) => {
@@ -641,13 +739,13 @@ app.post('/submit', async (c) => {
   const datasetDescription = typeof body.dataset_description === 'string' ? body.dataset_description.trim() : '';
   const datasetKind = typeof body.dataset_kind === 'string' ? body.dataset_kind.trim() : '';
   const datasetStatus = typeof body.dataset_status === 'string' ? body.dataset_status.trim() : '';
-  const file = body.artifact_file;
+  const files = (Array.isArray(body.artifact_file) ? body.artifact_file : [body.artifact_file]).filter((file): file is File => file instanceof File);
 
   const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
   const session = await getSession(c);
   const res = checkAuth(session?.token);
 
-  if (!fileName || !orgSelection || !datasetKind || !datasetStatus || !(file instanceof File)) {
+  if (!fileName || !orgSelection || !datasetKind || !datasetStatus || files.length === 0) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Enter a name, organization/source, dataset access, dataset status, and a file.')), res), 400);
   }
   else if (fileName.length > 255 || orgSelection.length > 50 || otherOrgFull.length > 300 || orgAcronym.length > 50 || datasetDate.length > 100 || datasetDescription.length > 12000 || datasetKind.length > 300 || datasetStatus.length > 20) {
@@ -668,21 +766,13 @@ app.post('/submit', async (c) => {
   else if (datasetDate && datasetDate.toLowerCase() !== 'unknown' && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(datasetDate)) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Use a date in YYYY, YYYY-MM, YYYY-MM-DD format, or enter unknown.')), res), 400);
   }
-  else if (file.size === 0 || file.size > maxUploadBytes) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The file must be between 1 byte and 10 MB.')), res), 400);
-  }
 
-  const originalName = file.name.replaceAll('\\', '/').split('/').pop() ?? '';
-  const extension = originalName.slice(originalName.lastIndexOf('.')).toLowerCase();
-  const allowed = allowedExtensions.get(extension);
-  if (!allowed || !allowed.mimeTypes.includes(file.type.toLowerCase())) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('Only CSV, JPG, and PNG files with a matching file type are accepted.')), res), 400);
-  }
-
-  // verify inputs
-  const content = Buffer.from(await file.arrayBuffer());
-  if (content.includes(0)) {
-    return c.html(layout(SubmitPage(await getOrganizations(), submitError('The CSV file contains binary data and could not be accepted.')), res), 400);
+  let uploadedArtifacts: Awaited<ReturnType<typeof getUploadedArtifacts>>;
+  try {
+    uploadedArtifacts = await getUploadedArtifacts(files);
+  } 
+  catch (error) {
+    return c.html(layout(SubmitPage(await getOrganizations(), submitError(error instanceof Error ? error.message : 'The upload is invalid.')), res), 400);
   }
 
   // add to organization database 
@@ -696,29 +786,28 @@ app.post('/submit', async (c) => {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select a valid organization.')), res), 400);
   }
 
-  let storedName: string | undefined;
+  const storedNames: string[] = [];
   try {
-
-    const uploadedFile = await uploadFile(content, extension);
-    storedName = uploadedFile.storedName;
-
-    await createArtifactWithTags({
-      artifact_type: allowed.type,
-      file_path: uploadedFile.filePath,
-      file_name: fileName,
+    const storedArtifacts = [];
+    for (const artifact of uploadedArtifacts) {
+      const uploadedFile = await uploadFile(artifact.content, artifact.extension);
+      storedNames.push(uploadedFile.storedName);
+      storedArtifacts.push({ artifact_type: artifact.type, file_path: uploadedFile.filePath, file_name: artifact.name });
+    }
+    await createArtifactGroup({
       reviewed: false,
       dataset_date: datasetDate || null,
       dataset_description: datasetDescription || null,
       dataset_kind: datasetKind,
       dataset_status: datasetStatus,
       org_id: resolvedOrg,
-    }, tags);
+    }, storedArtifacts, tags, fileName);
+
   }
 
   catch (error) {
-    if (storedName) {
-      await deleteFile(storedName).catch(() => undefined);
-    }
+    for (const storedName of storedNames) await deleteFile(storedName).catch(() => undefined);
+    console.error('Failed to save submission:', error);
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('The submission could not be saved. Please try again.')), res), 500);
   }
 
