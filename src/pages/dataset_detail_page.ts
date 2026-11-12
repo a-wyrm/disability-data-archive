@@ -13,18 +13,18 @@ type DatasetDetail = {
 
 
 function formatDate(value: Date) {
-	return value.toLocaleDateString('en-US', {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric',
-	});
+
+	return value.toUTCString();
 }
 
 export function DatasetDetailPage(dataset: DatasetDetail) {
+	//console.log(dataset.added_at);
+	//console.log(dataset.updated_at);
 	const tags = dataset.tags.length === 0
 		? '<span>None</span>'
 		: dataset.tags.map((tag) => `<span>${escapeHtml(tag.name)}</span>`).join('');
 	const isSingle = dataset.artifacts.length === 1;
+
 	const artifactRows = dataset.artifacts.map((artifact) => {
 		const isCsv = artifact.artifact_type.toLowerCase() === 'csv'
 			|| artifact.file_name.toLowerCase().endsWith('.csv');
@@ -34,6 +34,7 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 				<a class="artifact-link secondary" href="${escapeHtml(artifact.file_path)}" download>Download</a>
 			</span></li>`;
 	}).join('');
+
 	const datasetAction = isSingle
 		? artifactRows
 		: `<a class="artifact-link" href="/datasets/${dataset.dataset_id}/download">Download all as ZIP</a>

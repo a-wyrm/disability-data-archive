@@ -27,7 +27,7 @@ import { DatasetDetailPage } from './pages/dataset_detail_page.js';
 import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
 import { SubmitPage, submitError, submitSuccess } from './pages/submit_db.js';
-import { CsvViewer } from './components/csv_viewer.js';
+import { CsvViewer } from './components/data-interaction/csv_viewer.js';
 import { CreateAccountPage, accountError } from './pages/userPages/create_account.js';
 import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
@@ -35,6 +35,7 @@ import { ReviewFilePage } from './pages/userPages/review_files.js';
 import { HomePage } from './pages/home.js';
 import { OfficePage } from './pages/office.js';
 import { Archiver } from 'archiver';
+import { group } from 'node:console';
 
 
 // upload stuff
@@ -313,7 +314,7 @@ app.get('/offices', async (c) => {
   const [organizations, artifacts] = await Promise.all([getOrganizations(), getAllArtifacts()]);
   const officeCounts = new Map<string, number>();
   for (const artifact of artifacts) {
-    officeCounts.set(artifact.org_id, (officeCounts.get(artifact.org_id) ?? 0) + 1);
+    officeCounts.set(artifact.org_id, artifacts.length);
   }
   return c.html(layout(OfficePage(organizations, officeCounts), checkAuth(session?.token)));
 });
@@ -330,7 +331,8 @@ app.get('/datasets', async (c) => {
       representative_id: artifact.id,
     }));
 
-  const count_group = groupedArtifacts.length;
+
+  const count_group = artifacts.length;
   const taggedArtifacts = await Promise.all(groupedArtifacts.map((artifact) => findArtifactWithTags(Number(artifact.representative_id))));
 
   // map artifacts to their tags

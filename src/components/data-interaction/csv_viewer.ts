@@ -1,4 +1,5 @@
-import { escapeHtml } from "../utilities/escape_html.js";
+import { escapeHtml } from "../../utilities/escape_html.js";
+import { GraphBuilder } from "./graph-builder.js";
 
 type CsvDataset = {
 	file_name: string;
@@ -27,8 +28,9 @@ export function CsvViewer(dataset: CsvDataset, stylesheetVersion?: string) {
 					<p>Loading dataset…</p>
 				</div>
 			</div>
+			${GraphBuilder(dataset.file_path)}
 		</section>
-		<script src="/static/csv_viewer.js" defer></script>
+		<script src="/static/js/csv_viewer.js" defer></script>
 		<link rel="stylesheet" href="/static/css/csv_viewer.css${stylesheetVersion ? `?v=${stylesheetVersion}` : ""}">
 	`;
 }

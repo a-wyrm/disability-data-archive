@@ -388,8 +388,14 @@ export async function reviewArtifact(
       .execute();
     const artifactGroup = await trx.selectFrom('disability_artifacts')
       .select('dataset_id').where('id', '=', artifactId).executeTakeFirstOrThrow();
+    const unapprovedArtifact = await trx
+      .selectFrom('disability_artifacts')
+      .select('id')
+      .where('dataset_id', '=', artifactGroup.dataset_id)
+      .where('reviewed', '=', false)
+      .executeTakeFirst();
     await trx.updateTable('artifact_grouping')
-      .set({ reviewed: status === 'approved', updated_at: new Date() })
+      .set({ reviewed: !unapprovedArtifact, updated_at: new Date() })
       .where('dataset_id', '=', artifactGroup.dataset_id)
       .execute();
 

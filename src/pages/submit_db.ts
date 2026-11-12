@@ -118,6 +118,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
             for (const tag of active) {
                 const chip = document.createElement('span');
                 chip.className = 'badge react';
+                chip.style = 'padding-right: 5px;';
 
                 const label = document.createElement('span');
                 label.className = 'filter-chip_label';
