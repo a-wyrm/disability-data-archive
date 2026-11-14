@@ -14,11 +14,11 @@ export function SubmitPage(organizations: Organization[], message = "") {
 
       <form class="submit-form" method="post" action="/submit" enctype="multipart/form-data">
         <label for="file_name">Dataset or artifact name
-          <input id="file_name" name="file_name" type="text" maxlength="255" required autocomplete="off">
+          <input id="file_name" name="file_name" type="text" maxlength="255" autocomplete="off">
         </label>
 
         <label for="org_id">Organization or source
-          <select id="org_id" name="org_id" required>
+          <select id="org_id" name="org_id">
             <option value="">Select an organization</option>
             ${organizationOptions}
             <option value="other">Other</option>
@@ -26,7 +26,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
         </label>
 
         <label id="other-org-full-label" for="other_org_full" hidden>Full organization name
-          <input id="other_org_full" name="other_org_full" type="text" maxlength="300" autocomplete="organization" required>
+          <input id="other_org_full" name="other_org_full" type="text" maxlength="300" autocomplete="organization">
         </label>
 
         <label id="other-org-acronym-label" for="other_org_acronym" hidden>Organization Acronym
@@ -42,7 +42,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
         </label>
 
         <label for="dataset_kind">Dataset access
-          <select id="dataset_kind" name="dataset_kind" required>
+          <select id="dataset_kind" name="dataset_kind">
             <option value="">Select access</option>
             <option value="public">Public</option>
             <option value="private">Private</option>
@@ -50,7 +50,7 @@ export function SubmitPage(organizations: Organization[], message = "") {
         </label>
 
         <label for="dataset_status">Dataset status
-          <select id="dataset_status" name="dataset_status" required>
+          <select id="dataset_status" name="dataset_status">
             <option value="">Select status</option>
             <option value="available">Available</option>
             <option value="study">Study</option>
@@ -65,8 +65,13 @@ export function SubmitPage(organizations: Organization[], message = "") {
         <input id="tags_input" type="text" maxlength="25" autocomplete="off" placeholder="Type a tag and press Enter">
 
         <label for="artifact-file">File
-          <input id="artifact-file" name="artifact_file" type="file" accept=".csv,.jpg,.jpeg,.png,text/csv,image/jpeg,image/png,.zip,application/zip">
-          <small>Accepted formats: CSV, JPG, PNG, or a ZIP folder. Each file may be up to 10 MB.</small>
+          <input
+            id="artifact-file"
+            name="artifact_file"
+            type="file"
+            accept=".csv,.txt,.md,.json,.xml,.jpg,.jpeg,.png,.gif,.webp,.avif,.tif,.tiff,.pdf,.mp3,.wav,.ogg,.flac,.m4a,.mp4,.webm,.mov,text/csv,application/csv,application/vnd.ms-excel,text/plain,text/markdown,application/json,application/xml,text/xml,image/jpeg,image/png,image/gif,image/webp,image/avif,image/tiff,application/pdf,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,application/ogg,audio/flac,audio/x-flac,audio/mp4,audio/x-m4a,video/mp4,video/webm,video/quicktime"
+          >
+          <small>Each file may be up to 10 MB.</small>
         </label>
 
         <label class="submit-honeypot" aria-hidden="true">Leave this field blank

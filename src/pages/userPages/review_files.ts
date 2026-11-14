@@ -32,11 +32,17 @@ export function ReviewFilePage(
 	organizations: Organization[],
 	tags: string[],
 	knownTags: string[],
-	message = '',
+	message: string,
 ) {
+    
+    // user rep must be above 50 to edit
 	const canEdit = currentUserReputation > 49;
+    
+    // Keep approval disabled for temporary organization data until the reviewer selects a valid organization.
+	const hasTempOrganizationWarning = message.includes('temp');
+
 	const organizationOptions = organizations.map((organization) =>
-		`<option value="${escapeHtml(organization.acronym)}" ${organization.acronym === artifact.org_id ? 'selected' : ''}>${escapeHtml(organization.org_full)} (${escapeHtml(organization.acronym)})</option>`
+		`<option value="${escapeHtml(organization.acronym)}" data-org-full="${escapeHtml(organization.org_full)}" ${organization.acronym === artifact.org_id ? 'selected' : ''}>${escapeHtml(organization.org_full)} (${escapeHtml(organization.acronym)})</option>`
 	).join('');
 	const originalCreatedAt = artifact.created_at.toISOString();
 	const editableFields = `
@@ -69,7 +75,9 @@ export function ReviewFilePage(
             <label for="org_id">Organization
                 <select id="org_id" name="org_id" required>${organizationOptions}</select>
             </label>
-            <small>These changes are saved only when you approve this dataset.</small> 
+            <small>These changes are saved only when you approve this dataset.</small>
+            <br>
+            <small>${message}</small>
         `
 	return `
         <link rel="stylesheet" href="/static/css/user_pages.css?v=${getDevRevision()}">
@@ -95,7 +103,7 @@ export function ReviewFilePage(
             <form method="post" action="/userPages/review_files/${artifact.id}">
                 ${editableFields}
                 ${canEdit ? `
-                <button class="decision" name="decision" value="approved" type="submit">Approve</button>
+                <button id="approve-button" class="decision" name="decision" value="approved" type="submit" ${hasTempOrganizationWarning ? 'disabled' : ''}>Approve</button>
                 <button class="decision" name="decision" value="denied" type="submit">Deny</button>` : ''}
             </form>
             <script>
@@ -111,6 +119,17 @@ export function ReviewFilePage(
                         document.getElementById('comment').focus();
                     });
                 });
+
+                // Re-enable approval when the reviewer selects a valid organization.
+                const organizationSelect = document.getElementById('org_id');
+                const approveButton = document.getElementById('approve-button');
+                if (organizationSelect && approveButton) {
+                    organizationSelect.addEventListener('change', () => {
+                        const selectedOrganization = organizationSelect.selectedOptions[0];
+                        approveButton.disabled = selectedOrganization?.value === 'temp'
+                            || selectedOrganization?.dataset.orgFull === 'temp';
+                    });
+                }
             </script>
         </section>`;
 }

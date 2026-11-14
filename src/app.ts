@@ -28,6 +28,7 @@ import { AboutPage } from './pages/about.js';
 import { SearchPage } from './pages/search_page.js';
 import { SubmitPage, submitError, submitSuccess } from './pages/submit_db.js';
 import { CsvViewer } from './components/data-interaction/csv_viewer.js';
+import { PdfViewer } from './components/data-interaction/pdf_viewer.js';
 import { CreateAccountPage, accountError } from './pages/userPages/create_account.js';
 import { LoginPage, loginError } from './pages/userPages/login.js';
 import { ReviewListPage } from './pages/userPages/review_list.js';
@@ -35,7 +36,6 @@ import { ReviewFilePage } from './pages/userPages/review_files.js';
 import { HomePage } from './pages/home.js';
 import { OfficePage } from './pages/office.js';
 import { Archiver } from 'archiver';
-import { group } from 'node:console';
 
 
 // upload stuff
@@ -45,7 +45,7 @@ const CONTAINER_NAME = process.env.BLOB_CONTAINER_NAME ?? 'uploads';
 
 let blobServiceClient: BlobServiceClient | null = null;
 
-if (!USE_LOCAL_STORAGE) {
+if (USE_LOCAL_STORAGE === false) {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   if (!accountName) {
     throw new Error('AZURE_STORAGE_ACCOUNT_NAME is required when USE_LOCAL_STORAGE is false');
@@ -126,9 +126,21 @@ export async function deleteFile(storedName: string) {
 const maxUploadBytes = 10 * 1024 * 1024;
 const allowedExtensions = new Map([
   ['.csv', { type: 'csv', mimeTypes: ['text/csv', 'application/csv', 'application/vnd.ms-excel'] }],
+  ['.txt', { type: 'text', mimeTypes: ['text/plain'] }],
+  ['.md', { type: 'text', mimeTypes: ['text/markdown', 'text/plain'] }],
+  ['.json', { type: 'text', mimeTypes: ['application/json'] }],
+  ['.xml', { type: 'text', mimeTypes: ['application/xml', 'text/xml'] }],
+
   ['.jpg', { type: 'image', mimeTypes: ['image/jpeg'] }],
   ['.jpeg', { type: 'image', mimeTypes: ['image/jpeg'] }],
   ['.png', { type: 'image', mimeTypes: ['image/png'] }],
+  ['.gif', { type: 'image', mimeTypes: ['image/gif'] }],
+  ['.webp', { type: 'image', mimeTypes: ['image/webp'] }],
+  ['.avif', { type: 'image', mimeTypes: ['image/avif'] }],
+  ['.tif', { type: 'image', mimeTypes: ['image/tiff'] }],
+  ['.tiff', { type: 'image', mimeTypes: ['image/tiff'] }],
+
+  ['.pdf', { type: 'pdf', mimeTypes: ['application/pdf'] }],
 ]);
 
 // upload multiple files when a group of files is uploaded
@@ -189,7 +201,9 @@ function recordRows(records: ArtifactRecord[]) {
     : records.map((record) => {
       const isCsv = record.artifact_type.toLowerCase() === 'csv'
         || record.file_name.toLowerCase().endsWith('.csv');
-      const artifactUrl = isCsv
+      const isPdf = record.artifact_type.toLowerCase() === 'pdf'
+        || record.file_name.toLowerCase().endsWith('.pdf');
+      const artifactUrl = isCsv || isPdf
         ? `/datasets/${record.id}/view`
         : record.file_path;
 
@@ -218,7 +232,7 @@ app.use('*', async (c, next) => {
 // CSS sheets need to be re-rendered on pages when they are updated
 // this code block syncs the most recent version of the css files to display the most recent version
 const devStart = Date.now().toString();
-const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css', './static/css/header_styles.css', './static/css/user_pages.css'];
+const stylesheetPaths = ['./static/css/styles.css', './static/css/csv_viewer.css', './static/css/pdf_viewer.css', './static/css/header_styles.css', './static/css/user_pages.css'];
 export function getDevRevision() {
   const stylesheetRevisions = stylesheetPaths
     .map((stylesheetPath) => statSync(stylesheetPath).mtimeMs)
@@ -322,6 +336,7 @@ app.get('/offices', async (c) => {
 
 app.get('/datasets', async (c) => {
   const artifacts = await getAllArtifacts();
+
   const groupedArtifacts = [...new Map(artifacts.map((artifact) => [artifact.dataset_id, artifact])).values()]
     .map((artifact) => ({
       ...artifact,
@@ -332,7 +347,13 @@ app.get('/datasets', async (c) => {
     }));
 
 
-  const count_group = artifacts.length;
+
+  // get counts of each artifact in grouping
+	const agencyCounts = new Map<string, number>();
+	for (const dataset of artifacts) {
+    agencyCounts.set(String(dataset.dataset_id), (agencyCounts.get(String(dataset.dataset_id)) ?? 0) + 1);
+	}
+
   const taggedArtifacts = await Promise.all(groupedArtifacts.map((artifact) => findArtifactWithTags(Number(artifact.representative_id))));
 
   // map artifacts to their tags
@@ -404,7 +425,7 @@ app.get('/datasets', async (c) => {
     filteredRecords as unknown as Parameters<typeof DatasetPage>[0],
     filters,
     { allDatasets: groupedArtifacts as unknown as Parameters<typeof DatasetPage>[0], organizations},
-    count_group
+    agencyCounts
   ), res));
 });
 
@@ -438,13 +459,16 @@ app.get('/datasets/:datasetId/artifacts/:id/view', async (c) => {
   }
 
   const isCsv = dataset.artifact_type.toLowerCase() === 'csv' || dataset.file_name.toLowerCase().endsWith('.csv');
-  if (!isCsv) {
+  const isPdf = dataset.artifact_type.toLowerCase() === 'pdf' || dataset.file_name.toLowerCase().endsWith('.pdf');
+  if (!isCsv && !isPdf) {
     return c.redirect(`/datasets/${id}`);
   }
 
   const session = await getSession(c);
   const res = checkAuth(session?.token);
-  return c.html(layout(CsvViewer(dataset, getDevRevision()), res));
+  return c.html(layout(isCsv
+    ? CsvViewer(dataset, getDevRevision())
+    : PdfViewer(dataset, getDevRevision()), res));
 });
 
 app.get('/datasets/:id/download', async (c) => {
@@ -577,7 +601,15 @@ app.get('/userPages/review_files/:id', async (c) => {
     getPendingArtifactTags(id),
     getAllTags(),
   ]);
-  return c.html(layout(ReviewFilePage(
+
+  const organization = organizations.find((candidate) => candidate.acronym === artifact.org_id);
+  const message = artifact.org_id === 'temp' ||
+    organization?.acronym === 'temp' ||
+    organization?.org_full === 'temp'
+    ? 'org should not be temp. If you cannot track down the source of a dataset, deny the request.'
+    : '';
+
+  const returnHTML =  c.html(layout(ReviewFilePage(
     artifact,
     await getReviewComments(id),
     session.userId,
@@ -585,7 +617,10 @@ app.get('/userPages/review_files/:id', async (c) => {
     organizations,
     tags.map((tag) => tag.name),
     knownTags,
-  ), true));
+    message
+  ), true))
+
+  return returnHTML;
 });
 
 
@@ -670,6 +705,11 @@ app.post('/userPages/review_files/:id', async (c) => {
     const tags = typeof body.tags === 'string' ? [...new Set(body.tags.split(',').map((tag) => tag.trim()).filter(Boolean))] : [];
     const organizations = await getOrganizations();
     const validOrg = organizations.some((organization) => organization.acronym === orgId);
+    const selectedOrganization = organizations.find((organization) => organization.acronym === orgId);
+
+    if (orgId === 'temp' || selectedOrganization?.acronym === 'temp' || selectedOrganization?.org_full === 'temp') {
+      return c.text('org should not be temp. If you cannot track down the source of a dataset, deny the request.', 400);
+    }
 
     if (!createdAtValue || Number.isNaN(createdAt.getTime())|| !['public', 'private'].includes(datasetKind) || !['available', 'study', 'discontinued', 'removed', 'unknown'].includes(datasetStatus) || !validOrg || tags.some((tag) => tag.length > 25) || tags.length > 80 || description.length > 12000) {
       return c.text('The review edits are invalid.', 400);
@@ -731,14 +771,14 @@ app.post('/submit', async (c) => {
 
 
   // get names, ensure they are strings
-  const fileName = typeof body.file_name === 'string' ? body.file_name.trim() : '';
-  const orgSelection = typeof body.org_id === 'string' ? body.org_id.trim() : '';
-  const otherOrgFull = typeof body.other_org_full === 'string' ? body.other_org_full.trim() : '';
-  const orgAcronym = typeof body.other_org_acronym === 'string' ? body.other_org_acronym.trim() : '';
-  const datasetDate = typeof body.dataset_date === 'string' ? body.dataset_date.trim() : '';
-  const datasetDescription = typeof body.dataset_description === 'string' ? body.dataset_description.trim() : '';
-  const datasetKind = typeof body.dataset_kind === 'string' ? body.dataset_kind.trim() : '';
-  const datasetStatus = typeof body.dataset_status === 'string' ? body.dataset_status.trim() : '';
+  const fileName = body.file_name === '' ? 'temp' : body.file_name.toString().trim();
+  const orgSelection = body.org_id === '' ? 'other' : body.org_id.toString().trim();
+  const otherOrgFull = body.other_org_full === '' ? 'temp' : body.other_org_full.toString().trim();
+  const orgAcronym = body.other_org_acronym === '' ? 'temp' : body.other_org_acronym.toString().trim();
+  const datasetDate = body.dataset_date === '' ? '' : body.dataset_date.toString().trim();
+  const datasetDescription = body.dataset_description === '' ? 'temp' : body.dataset_description.toString().trim();
+  const datasetKind = body.dataset_kind === '' ? 'unknown' : body.dataset_kind.toString().trim();
+  const datasetStatus = body.dataset_status === '' ? 'unknown' : body.dataset_status.toString().trim();
   const files = (Array.isArray(body.artifact_file) ? body.artifact_file : [body.artifact_file]).filter((file): file is File => file instanceof File);
 
   const tags = (Array.isArray(body.tags) ? body.tags : [body.tags]).filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim())
@@ -751,7 +791,7 @@ app.post('/submit', async (c) => {
   else if (fileName.length > 255 || orgSelection.length > 50 || otherOrgFull.length > 300 || orgAcronym.length > 50 || datasetDate.length > 100 || datasetDescription.length > 12000 || datasetKind.length > 300 || datasetStatus.length > 20) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('One or more fields are longer than allowed.')), res), 400);
   }
-  else if (!['public', 'private'].includes(datasetKind)) {
+  else if (!['public', 'private', 'unknown'].includes(datasetKind)) {
     return c.html(layout(SubmitPage(await getOrganizations(), submitError('Select whether the dataset is public or private.')), res), 400);
   }
   else if (!['discontinued', 'removed', 'available', 'study', 'unknown'].includes(datasetStatus)) {

@@ -11,10 +11,10 @@ export function HomePage({ rescuedDatasets, volunteers }: HomeStats) {
       <div class="home-hero-copy">
         <h1 id="home-title">Preserving vulnerable disability data.</h1>
         <p class="home-lede">
-          Explore rescued datasets, help us identify data at risk, and keep disability data open and available for everyone.
+          Explore rescued artifacts, help us identify data at risk, and keep disability data open and available for everyone.
         </p>
         <div class="home-actions">
-          <a class="contrast" role="button" href="/datasets">Browse datasets</a>
+          <a class="contrast" role="button" href="/datasets">Browse artifacts</a>
           <a href="/submit">Help rescue data</a>
         </div>
       </div>
@@ -24,7 +24,7 @@ export function HomePage({ rescuedDatasets, volunteers }: HomeStats) {
     <section class="home-stats" aria-label="Archive statistics">
       <div class="home-stat">
         <strong>${rescuedDatasets.toLocaleString()}</strong>
-        <span>rescued datasets</span>
+        <span>rescued artifacts</span>
       </div>
       <div class="home-stat">
         <strong>${volunteers.toLocaleString()}</strong>
@@ -41,7 +41,7 @@ export function HomePage({ rescuedDatasets, volunteers }: HomeStats) {
       <div class="home-browse-grid">
         <a class="home-browse-card home-browse-card-featured" href="/datasets">
           <div>
-            <h3>Browse datasets</h3>
+            <h3>Browse artifacts</h3>
             <p>Search the rescued disability data currently available in the archive.</p>
           </div>
           <span class="home-card-arrow" aria-hidden="true">↗</span>

@@ -24,7 +24,7 @@ export async function DatasetPage(
 	datasets: DisabilityArtifactsTable[],
 	filters: DatasetFilters = {},
 	options: DatasetFilterOptions = { allDatasets: datasets, organizations: [] },
-	count: number
+	counts: Map<string, number>
 ){
 
 	// make pages paginated
@@ -98,12 +98,6 @@ export async function DatasetPage(
 
 	const agencyValue = filters.org_name ?? '';
 
-	const artifactCounts = new Map<number, number>();
-	for (const dataset of options.allDatasets) {
-		artifactCounts.set(Number(dataset.dataset_id), (artifactCounts.get(Number(dataset.dataset_id)) ?? 0) + 1);
-	}
-
-
 	const agencyOptions = agencies.map(({ acronym, name, count }) => `
 							<label><input type="checkbox" name="org_name" value="${escapeHtml(acronym)}"${acronym === agencyValue ? ' checked' : ''}> ${escapeHtml(name)} (${count.toLocaleString()})</label>
 						`).join('');
@@ -122,7 +116,7 @@ export async function DatasetPage(
 				</div>
 				<div>
 					<p class="eyebrow">${escapeHtml(dataset.org_id)}</p>
-						<h2>${escapeHtml(dataset.file_name)} (${count ?? 1} artifact${count === 1 ? '' : 's'})</h2>
+						<h2>${escapeHtml(dataset.file_name)} (${counts.get(String(dataset.dataset_id)) ?? 1} artifact${counts.get(String(dataset.dataset_id)) === 1 ? '' : 's'})</h2>
 				</div>
 				<footer>
 					<span>${(artifactsWithTags[index]?.tags ?? []).map(tag => escapeHtml(tag.name)).join(' · ')}</span>

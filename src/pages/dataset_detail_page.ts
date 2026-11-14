@@ -18,6 +18,7 @@ function formatDate(value: Date) {
 }
 
 export function DatasetDetailPage(dataset: DatasetDetail) {
+
 	//console.log(dataset.added_at);
 	//console.log(dataset.updated_at);
 	const tags = dataset.tags.length === 0
@@ -28,9 +29,12 @@ export function DatasetDetailPage(dataset: DatasetDetail) {
 	const artifactRows = dataset.artifacts.map((artifact) => {
 		const isCsv = artifact.artifact_type.toLowerCase() === 'csv'
 			|| artifact.file_name.toLowerCase().endsWith('.csv');
+		const isPdf = artifact.artifact_type.toLowerCase() === 'pdf'
+			|| artifact.file_name.toLowerCase().endsWith('.pdf');
 		return `<li><span>${escapeHtml(artifact.file_name)}</span>
 			<span class="artifact-actions">
 				${isCsv ? `<a class="artifact-link" href="/datasets/${dataset.dataset_id}/artifacts/${artifact.id}/view">View CSV</a>` : ''}
+				${isPdf ? `<a class="artifact-link" href="/datasets/${dataset.dataset_id}/artifacts/${artifact.id}/view">View PDF</a>` : ''}
 				<a class="artifact-link secondary" href="${escapeHtml(artifact.file_path)}" download>Download</a>
 			</span></li>`;
 	}).join('');

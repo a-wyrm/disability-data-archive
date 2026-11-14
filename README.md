@@ -36,6 +36,7 @@ Environment variables:
 | `DB_USERNAME` | PostgreSQL username used by Docker Compose and the application database connection. |
 | `DB_PASSWORD` | Password for `DB_USERNAME`, used by Docker Compose and the application database connection. |
 | `DATABASE_URL` | PostgreSQL connection string used by the application and migration scripts. Use `db` as the hostname inside Docker Compose and `localhost` when running commands directly on the host. |
+| `USE_LOCAL_STORAGE` | Set to `true` to store uploads in the Docker `uploads_data` volume, or `false` to use Azure Blob Storage. Docker Compose defaults this to `true` when it is not set. |
 
 
 ### Step 2: Install dependencies using NPM
@@ -89,6 +90,7 @@ While `npm run dev` is running, edits under `src/` restart Hono and automaticall
 1. Start the frontend:
     ```
     npm run dev
+    docker compose exec db psql -U archive -d disability_archive -f /docker-entrypoint-initdb.d/003_user_cookies.sql     
     ```
 
 2. To start the backend:
